@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? `${title} - Berita OpenSource` : 'Berita OpenSource - Aktual, Tepercaya, dan Mendalam' %></title>
+  <meta name="description" content="<%= typeof metaDescription !== 'undefined' ? metaDescription : 'Portal berita terkini, politik, olahraga, teknologi, dan kabar terpercaya lainnya.' %>">
+  
+  <!-- CSS Utama -->
+  <link rel="stylesheet" href="/css/style.css">
+  
+  <!-- Skrip Inisialisasi Tema (mencegah flickering) -->
+  <script src="/js/theme.js"></script>
+</head>
+<body>
+  <!-- Navigasi & Header Utama -->
+  <header class="site-header">
+    <div class="container">
+      <div class="header-top">
+        <!-- Logo -->
+        <a href="/" class="site-logo" title="Beranda Berita OpenSource">
+          Berita <span>OpenSource</span>
+        </a>
+
+        <!-- Form Pencarian -->
+        <div class="search-box">
+          <form action="/cari" method="GET" class="search-form" role="search">
+            <input 
+              type="text" 
+              name="q" 
+              class="search-input" 
+              placeholder="Cari berita atau isu terkini..." 
+              value="<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>"
+              required
+            >
+            <button type="submit" class="search-btn" aria-label="Cari">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+          </form>
+        </div>
+
+        <!-- Tombol Aksi -->
+        <div class="header-actions">
+          <a href="/tiket" class="btn-beli-tiket" title="Pesan dan Beli Tiket Bus Antar Kota">
+            <span class="btn-icon">🎟️</span>
+            <span>Beli Tiket Bus</span>
+          </a>
+          <button id="theme-toggle" class="theme-toggle-btn" aria-label="Ganti Tema">
+            <span class="theme-icon">🌙</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigasi Kategori Berita -->
+      <nav class="category-nav" aria-label="Navigasi Kategori">
+        <ul class="category-list">
+          <li>
+            <a href="/" class="category-link <%= typeof activeCategory !== 'undefined' && activeCategory === 'all' ? 'active' : '' %>">
+              Semua
+            </a>
+          </li>
+          <% if (typeof categories !== 'undefined' && categories.length > 0) { %>
+            <% categories.forEach(cat => { %>
+              <li>
+                <a 
+                  href="/kategori/<%= cat.slug %>" 
+                  class="category-link <%= typeof activeCategory !== 'undefined' && activeCategory === cat.slug ? 'active' : '' %>"
+                >
+                  <%= cat.name %>
+                </a>
+              </li>
+            <% }) %>
+          <% } %>
+          <li>
+            <a href="/tiket" class="category-link">🎟️ Tiket Bus</a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">

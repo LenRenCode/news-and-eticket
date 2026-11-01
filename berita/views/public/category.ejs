@@ -1,0 +1,106 @@
+<%- include('../layouts/header', { 
+  title: `Kategori: ${category.name}`, 
+  activeCategory: category.slug, 
+  categories 
+}) %>
+
+<div class="main-layout" style="margin-top: 2rem;">
+  <section class="category-articles">
+    <div class="section-header">
+      <div>
+        <h1 class="section-title" style="font-size: 1.6rem;">Kategori: <%= category.name %></h1>
+        <p style="color: var(--text-secondary); margin-top: 0.35rem; font-size: 0.95rem;">
+          Menampilkan <%= pagination.total %> berita terbit dalam topik ini
+        </p>
+      </div>
+    </div>
+
+    <% if (articles && articles.length > 0) { %>
+      <div class="articles-grid">
+        <% articles.forEach(article => { %>
+          <article class="article-card">
+            <a href="/artikel/<%= article.slug %>" class="card-image-wrapper">
+              <img 
+                src="<%= article.image_path || '/images/default-article.svg' %>" 
+                alt="<%= article.title %>" 
+                class="card-image"
+                loading="lazy"
+              >
+            </a>
+            <div class="card-content">
+              <h3 class="card-title">
+                <a href="/artikel/<%= article.slug %>"><%= article.title %></a>
+              </h3>
+
+              <p class="card-summary"><%= article.summary %></p>
+
+              <div class="article-meta">
+                <span><%= formatDateIndo(article.published_at || article.created_at) %></span>
+                <span class="separator">&bull;</span>
+                <span>👁️ <%= article.views %></span>
+              </div>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+
+      <!-- Paginasi Kategori -->
+      <% if (pagination.totalPages > 1) { %>
+        <nav class="pagination" aria-label="Navigasi Halaman Kategori">
+          <% if (pagination.hasPrev) { %>
+            <a href="/kategori/<%= category.slug %>?page=<%= pagination.page - 1 %>" class="page-btn">
+              &larr; Sebelumnya
+            </a>
+          <% } else { %>
+            <span class="page-btn disabled">&larr; Sebelumnya</span>
+          <% } %>
+
+          <span class="page-info">Halaman <%= pagination.page %> dari <%= pagination.totalPages %></span>
+
+          <% if (pagination.hasNext) { %>
+            <a href="/kategori/<%= category.slug %>?page=<%= pagination.page + 1 %>" class="page-btn">
+              Selanjutnya &rarr;
+            </a>
+          <% } else { %>
+            <span class="page-btn disabled">Selanjutnya &rarr;</span>
+          <% } %>
+        </nav>
+      <% } %>
+
+    <% } else { %>
+      <div class="empty-state">
+        <h3>Belum Ada Berita di Kategori Ini</h3>
+        <p>Silakan kembali lagi nanti untuk berita terbit terbaru seputar <%= category.name %>.</p>
+      </div>
+    <% } %>
+  </section>
+
+  <!-- Sidebar Populer -->
+  <aside class="sidebar">
+    <div class="sidebar-widget">
+      <div class="section-header">
+        <h2 class="section-title">Berita Populer</h2>
+      </div>
+
+      <% if (popularArticles && popularArticles.length > 0) { %>
+        <div class="popular-list">
+          <% popularArticles.forEach((article, index) => { %>
+            <div class="popular-item">
+              <span class="popular-rank"><%= index + 1 %></span>
+              <div class="popular-content">
+                <h4 class="popular-title">
+                  <a href="/artikel/<%= article.slug %>"><%= article.title %></a>
+                </h4>
+                <div class="article-meta" style="font-size: 0.78rem;">
+                  <span>👁️ <%= article.views %> dibaca</span>
+                </div>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </aside>
+</div>
+
+<%- include('../layouts/footer', { categories }) %>

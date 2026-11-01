@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kategori - Berita OpenSource</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <%- include('_nav', { adminPath, currentUser, csrfToken }) %>
+    <main class="admin-main">
+      <header class="admin-topbar"><h1>Kelola Kategori</h1></header>
+      <section class="admin-content">
+        <% if (error) { %><p class="alert-danger" role="alert"><%= error %></p><% } %>
+        <% if (saved) { %><p class="flash-message">Kategori berhasil disimpan.</p><% } %>
+        <form class="category-create-form" action="<%= adminPath %>/kategori" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <label for="name">Tambah kategori</label>
+          <div class="category-create-row">
+            <input id="name" name="name" type="text" maxlength="80" required>
+            <button class="btn-primary btn-inline" type="submit">Tambah</button>
+          </div>
+        </form>
+
+        <div class="table-wrap admin-panel">
+          <table class="admin-table">
+            <thead><tr><th>Nama</th><th>Slug</th><th>Berita</th><th>Aksi</th></tr></thead>
+            <tbody>
+              <% categories.forEach((category) => { %>
+                <tr>
+                  <td>
+                    <form class="category-edit-form" action="<%= adminPath %>/kategori/<%= category.id %>" method="POST">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <input name="name" aria-label="Nama kategori" type="text" maxlength="80" value="<%= category.name %>" required>
+                      <button class="action-link" type="submit">Simpan</button>
+                    </form>
+                  </td>
+                  <td><code><%= category.slug %></code></td>
+                  <td><%= category.article_count %></td>
+                  <td>
+                    <form action="<%= adminPath %>/kategori/<%= category.id %>/hapus" method="POST" onsubmit="return confirm('Hapus kategori ini? Berita terkait akan menjadi tanpa kategori.')">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button class="action-link danger-link" type="submit">Hapus</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

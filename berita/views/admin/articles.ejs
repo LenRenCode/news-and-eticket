@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Berita - Berita OpenSource</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <%- include('_nav', { adminPath, currentUser, csrfToken }) %>
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <h1>Berita</h1>
+        <a class="btn-primary btn-inline" href="<%= adminPath %>/berita/tulis">Tulis berita</a>
+      </header>
+      <section class="admin-content">
+        <form class="filter-form" action="<%= adminPath %>/berita" method="GET">
+          <label>
+            Cari judul atau isi
+            <input type="search" name="q" value="<%= query %>" placeholder="Kata kunci">
+          </label>
+          <label>
+            Status
+            <select name="status">
+              <option value="">Semua status</option>
+              <% statuses.forEach((status) => { %>
+                <option value="<%= status %>" <%= selectedStatus === status ? 'selected' : '' %>><%= status %></option>
+              <% }); %>
+            </select>
+          </label>
+          <button type="submit" class="btn-primary btn-inline">Filter</button>
+        </form>
+
+        <% if (typeof query !== 'undefined' && query) { %><p class="flash-message">Hasil pencarian untuk “<%= query %>”</p><% } %>
+        <% if (typeof status !== 'undefined') { %><% } %>
+        <% if (articles.length) { %>
+          <div class="table-wrap admin-panel admin-articles-table">
+            <table class="admin-table">
+              <thead><tr><th>Judul</th><th>Kategori</th><% if (currentUser.role !== 'penulis') { %><th>Penulis</th><% } %><th>Status</th><th>Dibaca</th><th>Aksi</th></tr></thead>
+              <tbody>
+                <% articles.forEach((article) => { %>
+                  <tr>
+                    <td data-label="Judul"><a href="<%= adminPath %>/berita/<%= article.id %>/edit"><%= article.title %></a></td>
+                    <td data-label="Kategori"><%= article.category_name || '-' %></td>
+                    <% if (currentUser.role !== 'penulis') { %><td data-label="Penulis"><%= article.author_name || 'Redaksi' %></td><% } %>
+                    <td data-label="Status"><span class="status-badge status-<%= article.status %>"><%= article.status %></span></td>
+                    <td data-label="Dibaca"><%= article.views %></td>
+                    <td class="table-actions" data-label="Aksi">
+                      <a class="action-link" href="<%= adminPath %>/berita/<%= article.id %>/edit">Edit</a>
+                      <% if (['owner', 'editor'].includes(currentUser.role)) { %>
+                        <form action="<%= adminPath %>/berita/<%= article.id %>/hapus" method="POST" onsubmit="return confirm('Hapus berita ini?')">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <button class="action-link danger-link" type="submit">Hapus</button>
+                        </form>
+                      <% } %>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <p class="empty-admin">Tidak ada berita yang cocok dengan filter.</p>
+        <% } %>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

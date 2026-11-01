@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backup - Berita OpenSource</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <%- include('_nav', { adminPath, currentUser, csrfToken }) %>
+    <main class="admin-main">
+      <header class="admin-topbar"><h1>Backup dan Restore</h1></header>
+      <section class="admin-content backup-content">
+        <% if (error) { %><p class="alert-danger" role="alert"><%= error %></p><% } %>
+        <% if (success) { %><p class="user-success" role="status"><%= success %></p><% } %>
+
+        <section class="backup-panel">
+          <h2>Buat Backup</h2>
+          <p>Backup berisi snapshot database SQLite dan semua gambar di folder uploads.</p>
+          <form action="<%= adminPath %>/backup/buat" method="POST">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="btn-primary backup-button">Buat Backup</button>
+          </form>
+        </section>
+
+        <section class="backup-panel">
+          <h2>Pulihkan dari ZIP</h2>
+          <p>Restore akan membuat backup pengaman otomatis sebelum mengganti database dan gambar. Server harus direstart setelah proses selesai.</p>
+          <form action="<%= adminPath %>/backup/restore" method="POST" enctype="multipart/form-data" class="backup-restore-form">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <label for="backup-file">File backup (.zip, maksimal 512 MB)</label>
+            <input id="backup-file" name="backup" type="file" accept=".zip,application/zip" required>
+            <button type="submit" class="user-danger-button">Pulihkan dan minta restart</button>
+          </form>
+        </section>
+
+        <section class="backup-panel">
+          <h2>Riwayat Backup (<%= backups.length %>)</h2>
+          <% if (!backups.length) { %>
+            <p class="empty-admin">Belum ada backup.</p>
+          <% } else { %>
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead><tr><th>Nama file</th><th>Dibuat</th><th>Ukuran</th><th>Aksi</th></tr></thead>
+                <tbody>
+                  <% backups.forEach((backup) => { %>
+                    <tr>
+                      <td><%= backup.filename %></td>
+                      <td><%= new Date(backup.createdAt).toLocaleString('id-ID') %></td>
+                      <td><%= (backup.size / 1024 / 1024).toFixed(2) %> MB</td>
+                      <td>
+                        <div class="backup-actions">
+                          <a class="user-secondary-button" href="<%= adminPath %>/backup/unduh/<%= encodeURIComponent(backup.filename) %>">Unduh</a>
+                          <form action="<%= adminPath %>/backup/hapus/<%= encodeURIComponent(backup.filename) %>" method="POST">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                            <button class="user-danger-button" type="submit">Hapus</button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </section>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

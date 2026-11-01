@@ -1,0 +1,199 @@
+<%- include('../layouts/header', { title: 'Beranda Berita Terkini & Populer', activeCategory: 'all', categories }) %>
+
+<% if (headlineSlides && headlineSlides.length > 0) { %>
+  <section class="hero-carousel" data-hero-carousel aria-label="Berita utama">
+    <div class="hero-slides" aria-live="polite">
+      <% headlineSlides.forEach((article, index) => { %>
+        <article class="hero-slide" data-hero-slide <%= index === 0 ? '' : 'hidden' %>>
+          <img
+            class="hero-image"
+            src="<%= article.image_path || '/images/default-article.svg' %>"
+            alt=""
+            <%= index === 0 ? 'fetchpriority="high"' : 'loading="lazy"' %>
+          >
+          <div class="hero-shade"></div>
+          <div class="hero-content">
+            <div class="hero-copy">
+              <% if (article.category_name) { %>
+                <a class="hero-category" href="/kategori/<%= article.category_slug %>"><%= article.category_name %></a>
+              <% } %>
+              <p class="hero-kicker">Sorotan berita</p>
+              <h1 class="hero-title"><a href="/artikel/<%= article.slug %>"><%= article.title %></a></h1>
+              <% if (article.summary) { %><p class="hero-summary"><%= article.summary %></p><% } %>
+              <div class="hero-meta">
+                <span>Oleh <strong><%= article.author_name || 'Redaksi' %></strong></span>
+                <span aria-hidden="true">·</span>
+                <time datetime="<%= article.published_at || article.created_at %>"><%= formatDateIndo(article.published_at || article.created_at) %></time>
+                <span aria-hidden="true">·</span>
+                <span><%= article.views %> kali dibaca</span>
+              </div>
+              <a class="hero-read-link" href="/artikel/<%= article.slug %>">Baca selengkapnya <span aria-hidden="true">→</span></a>
+            </div>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+
+    <% if (headlineSlides.length > 1) { %>
+      <div class="hero-controls" aria-label="Kontrol berita utama">
+        <button class="hero-arrow" type="button" data-hero-previous aria-label="Berita sebelumnya">
+          <span aria-hidden="true">‹</span>
+        </button>
+        <div class="hero-pagination">
+          <span class="hero-slide-count"><span data-hero-current>01</span> / <%= String(headlineSlides.length).padStart(2, '0') %></span>
+          <div class="hero-dots">
+            <% headlineSlides.forEach((article, index) => { %>
+              <button
+                type="button"
+                class="hero-dot <%= index === 0 ? 'active' : '' %>"
+                data-hero-dot="<%= index %>"
+                aria-label="Tampilkan berita <%= index + 1 %>"
+                aria-current="<%= index === 0 ? 'true' : 'false' %>"
+              ></button>
+            <% }) %>
+          </div>
+        </div>
+        <button class="hero-arrow" type="button" data-hero-next aria-label="Berita berikutnya">
+          <span aria-hidden="true">›</span>
+        </button>
+      </div>
+    <% } %>
+  </section>
+<% } %>
+
+<!-- Banner CTA Pemesanan Tiket Bus -->
+<section class="ticket-cta-banner" aria-label="Layanan Pemesanan Tiket Bus">
+  <div class="ticket-cta-card">
+    <div class="ticket-cta-info">
+      <div class="ticket-cta-badge">🎟️ Layanan Terpadu</div>
+      <h2 class="ticket-cta-title">Pesan Tiket Bus Antar Kota Online</h2>
+      <p class="ticket-cta-desc">
+        Perjalanan nyaman rute Samarinda &ndash; Penajam &amp; sebaliknya. Pilih jadwal keberangkatan, tentukan kursi, dan bayar instan via QRIS.
+      </p>
+      <div class="ticket-cta-features">
+        <span>⚡ Konfirmasi Instan</span>
+        <span>🛡️ Tiket QR Code Resmi</span>
+        <span>💳 Pembayaran QRIS Aman</span>
+      </div>
+    </div>
+    <div class="ticket-cta-action">
+      <a href="/tiket" class="ticket-cta-button">
+        <span>Beli Tiket Bus Sekarang</span>
+        <span class="cta-arrow" aria-hidden="true">&rarr;</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Tata Letak Utama: Grid Berita Terbaru & Sidebar Populer -->
+<div class="main-layout">
+  <!-- Kolom Kiri: Berita Terbaru -->
+  <section class="latest-section">
+    <div class="section-header">
+      <h2 class="section-title">Berita Terbaru</h2>
+      <span class="page-info">Total <%= pagination.total %> Berita</span>
+    </div>
+
+    <% if (latestArticles && latestArticles.length > 0) { %>
+      <div class="articles-grid">
+        <% latestArticles.forEach(article => { %>
+          <article class="article-card">
+            <a href="/artikel/<%= article.slug %>" class="card-image-wrapper">
+              <img 
+                src="<%= article.image_path || '/images/default-article.svg' %>" 
+                alt="<%= article.title %>" 
+                class="card-image"
+                loading="lazy"
+              >
+            </a>
+            <div class="card-content">
+              <% if (article.category_name) { %>
+                <a href="/kategori/<%= article.category_slug %>" class="category-badge">
+                  <%= article.category_name %>
+                </a>
+              <% } %>
+
+              <h3 class="card-title">
+                <a href="/artikel/<%= article.slug %>"><%= article.title %></a>
+              </h3>
+
+              <p class="card-summary"><%= article.summary %></p>
+
+              <div class="article-meta">
+                <span><%= formatDateIndo(article.published_at || article.created_at) %></span>
+                <span class="separator">&bull;</span>
+                <span>👁️ <%= article.views %></span>
+              </div>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+
+      <!-- Paginasi -->
+      <% if (pagination.totalPages > 1) { %>
+        <nav class="pagination" aria-label="Navigasi Halaman Berita">
+          <% if (pagination.hasPrev) { %>
+            <a href="/?page=<%= pagination.page - 1 %>" class="page-btn">
+              &larr; Sebelumnya
+            </a>
+          <% } else { %>
+            <span class="page-btn disabled">&larr; Sebelumnya</span>
+          <% } %>
+
+          <span class="page-info">Halaman <%= pagination.page %> dari <%= pagination.totalPages %></span>
+
+          <% if (pagination.hasNext) { %>
+            <a href="/?page=<%= pagination.page + 1 %>" class="page-btn">
+              Selanjutnya &rarr;
+            </a>
+          <% } else { %>
+            <span class="page-btn disabled">Selanjutnya &rarr;</span>
+          <% } %>
+        </nav>
+      <% } %>
+
+    <% } else { %>
+      <div class="empty-state">
+        <h3>Belum Ada Berita</h3>
+        <p>Belum ada artikel tambahan yang diterbitkan saat ini.</p>
+      </div>
+    <% } %>
+  </section>
+
+  <!-- Kolom Kanan: Sidebar Populer -->
+  <aside class="sidebar" aria-label="Berita Terpopuler">
+    <div class="sidebar-widget">
+      <div class="section-header">
+        <h2 class="section-title">Berita Populer</h2>
+      </div>
+
+      <% if (popularArticles && popularArticles.length > 0) { %>
+        <div class="popular-list">
+          <% popularArticles.forEach((article, index) => { %>
+            <div class="popular-item">
+              <span class="popular-rank"><%= index + 1 %></span>
+              <div class="popular-content">
+                <% if (article.category_name) { %>
+                  <a href="/kategori/<%= article.category_slug %>" class="category-badge" style="font-size: 0.7rem; padding: 0.15rem 0.5rem; margin-bottom: 0.35rem;">
+                    <%= article.category_name %>
+                  </a>
+                <% } %>
+                <h4 class="popular-title">
+                  <a href="/artikel/<%= article.slug %>"><%= article.title %></a>
+                </h4>
+                <div class="article-meta" style="font-size: 0.78rem;">
+                  <span>👁️ <%= article.views %> dibaca</span>
+                </div>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">Belum ada data popularitas.</p>
+      <% } %>
+    </div>
+  </aside>
+</div>
+
+<script src="/js/hero-carousel.js" defer></script>
+<%- include('../layouts/footer', { categories }) %>

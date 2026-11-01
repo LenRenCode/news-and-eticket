@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kelola Kategori - Panel Redaksi</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
+        Berita OpenSource
+        <span>Panel Redaksi</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="<%= adminPath %>" class="nav-link">
+          📊 Dashboard
+        </a>
+        <a href="<%= adminPath %>/berita" class="nav-link">
+          📰 Kelola Berita
+        </a>
+        <a href="<%= adminPath %>/kategori" class="nav-link active">
+          📁 Kategori
+        </a>
+        <% if (currentUser.role === 'owner') { %>
+          <a href="<%= adminPath %>/pengguna" class="nav-link">
+            👥 Pengguna
+          </a>
+          <a href="<%= adminPath %>/backup" class="nav-link">
+            💾 Backup & Restore
+          </a>
+        <% } %>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <div class="user-badge">
+          <span>Masuk sebagai: <strong><%= currentUser.username %></strong></span>
+          <span class="role-pill role-<%= currentUser.role %>"><%= currentUser.role %></span>
+        </div>
+
+        <form action="<%= adminPath %>/logout" method="POST" style="margin: 0;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn-logout">
+            🚪 Keluar
+          </button>
+        </form>
+      </header>
+
+      <div class="admin-content">
+        <div style="margin-bottom: 2rem;">
+          <h1 style="font-size: 1.6rem; font-weight: 800;">Kelola Rubrik Kategori</h1>
+          <p style="color: var(--admin-text-muted); font-size: 0.9rem;">
+            Tambah atau perbarui kategori berita portal (Khusus Editor & Owner).
+          </p>
+        </div>
+
+        <% if (typeof error !== 'undefined' && error) { %>
+          <div class="alert-danger" role="alert"><%= error %></div>
+        <% } %>
+        <% if (typeof success !== 'undefined' && success) { %>
+          <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #6ee7b7; padding: 0.75rem 1rem; border-radius: var(--radius); margin-bottom: 1.5rem;">
+            <%= success %>
+          </div>
+        <% } %>
+
+        <div style="display: grid; grid-template-columns: 1fr 1.6fr; gap: 2rem; align-items: flex-start;">
+          <!-- Form Tambah Kategori -->
+          <div style="background: var(--admin-card); border: 1px solid var(--admin-border); border-radius: var(--radius); padding: 1.5rem;">
+            <h3 style="font-size: 1.1rem; margin-bottom: 1rem;">Tambah Kategori Baru</h3>
+            <form action="<%= adminPath %>/kategori/tambah" method="POST">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+              <div class="form-group">
+                <label for="name" class="form-label">Nama Kategori <span style="color:#ef4444;">*</span></label>
+                <input 
+                  type="text" 
+                  id="name" 
+                  name="name" 
+                  class="form-input" 
+                  placeholder="Contoh: Bisnis, Otomotif, Gaya Hidup" 
+                  required
+                >
+              </div>
+
+              <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label for="slug" class="form-label">Slug URL (Opsional)</label>
+                <input 
+                  type="text" 
+                  id="slug" 
+                  name="slug" 
+                  class="form-input" 
+                  placeholder="Otomatis dari nama kategori jika kosong"
+                >
+              </div>
+
+              <button type="submit" class="btn-primary">
+                + Tambah Kategori
+              </button>
+            </form>
+          </div>
+
+          <!-- Tabel Kategori -->
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nama Kategori</th>
+                  <th>Slug URL</th>
+                  <th>Total Berita</th>
+                  <th style="text-align: right;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (categories && categories.length > 0) { %>
+                  <% categories.forEach(cat => { %>
+                    <tr>
+                      <td>
+                        <strong><%= cat.name %></strong>
+                      </td>
+                      <td><code><%= cat.slug %></code></td>
+                      <td>
+                        <span style="color: var(--admin-primary); font-weight: 700;">
+                          <%= cat.article_count %>
+                        </span> berita
+                      </td>
+                      <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 0.4rem; justify-content: flex-end;">
+                          <a href="/kategori/<%= cat.slug %>" target="_blank" class="btn-sm btn-secondary" title="Buka Halaman Publik">
+                            👁️
+                          </a>
+
+                          <form action="<%= adminPath %>/kategori/hapus/<%= cat.id %>" method="POST" style="display: inline;" onsubmit="return confirm('Hapus kategori <%= cat.name %>? Artikel terkait akan tetap ada tanpa kategori.');">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                            <button type="submit" class="btn-sm btn-danger" title="Hapus Kategori">
+                              🗑️
+                            </button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  <% }) %>
+                <% } else { %>
+                  <tr>
+                    <td colspan="4" style="text-align: center; padding: 2rem; color: var(--admin-text-muted);">
+                      Belum ada kategori terdaftar.
+                    </td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

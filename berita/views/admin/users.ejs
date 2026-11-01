@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pengguna - Berita OpenSource</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <%- include('_nav', { adminPath, currentUser, csrfToken }) %>
+    <main class="admin-main">
+      <header class="admin-topbar"><h1>Kelola Pengguna</h1></header>
+      <section class="admin-content">
+        <% if (error) { %><p class="alert-danger" role="alert"><%= error %></p><% } %>
+        <% if (message) { %><p class="user-success" role="status"><%= message %></p><% } %>
+
+        <section class="user-create-panel">
+          <h2>Tambah Pengguna</h2>
+          <form action="<%= adminPath %>/pengguna" method="POST" class="user-create-form">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <label for="new-username">Username</label>
+            <input id="new-username" name="username" type="text" maxlength="50" autocomplete="off" value="<%= typeof form !== 'undefined' && form ? form.username : '' %>" required>
+
+            <label for="new-password">Password sementara</label>
+            <div class="user-password-row">
+              <input id="new-password" name="password" type="text" minlength="8" maxlength="72" autocomplete="new-password" required>
+              <button type="button" class="user-secondary-button" data-generate-password data-target="new-password">Buat acak</button>
+            </div>
+
+            <label for="new-role">Peran</label>
+            <select id="new-role" name="role" required>
+              <option value="">Pilih peran</option>
+              <% roles.forEach((role) => { %>
+                <option value="<%= role %>" <%= typeof form !== 'undefined' && form && form.role === role ? 'selected' : '' %>><%= role %></option>
+              <% }); %>
+            </select>
+
+            <button type="submit" class="btn-primary">Tambah pengguna</button>
+            <p class="user-form-hint">Akun baru wajib mengganti password saat pertama kali masuk.</p>
+          </form>
+        </section>
+
+        <section class="user-list-panel">
+          <h2>Daftar Pengguna (<%= users.length %>)</h2>
+          <div class="table-wrap">
+            <table class="admin-table user-table">
+              <thead>
+                <tr><th>Username</th><th>Peran</th><th>Status</th><th>Aksi</th></tr>
+              </thead>
+              <tbody>
+                <% users.forEach((user) => { %>
+                  <tr>
+                    <td>
+                      <strong><%= user.username %></strong>
+                      <% if (user.must_change_password) { %><small class="user-hint">Wajib ganti password</small><% } %>
+                    </td>
+                    <td>
+                      <form action="<%= adminPath %>/pengguna/<%= user.id %>/peran" method="POST" class="user-inline-form">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                        <select name="role" aria-label="Peran <%= user.username %>" required>
+                          <% roles.forEach((role) => { %>
+                            <option value="<%= role %>" <%= user.role === role ? 'selected' : '' %>><%= role %></option>
+                          <% }); %>
+                        </select>
+                        <button class="user-secondary-button" type="submit">Simpan peran</button>
+                      </form>
+                    </td>
+                    <td>
+                      <span class="user-status <%= user.is_active ? 'user-status-active' : 'user-status-inactive' %>">
+                        <%= user.is_active ? 'Aktif' : 'Nonaktif' %>
+                      </span>
+                    </td>
+                    <td>
+                      <div class="user-actions">
+                        <form action="<%= adminPath %>/pengguna/<%= user.id %>/reset-password" method="POST" class="user-reset-form">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <label class="sr-only" for="reset-password-<%= user.id %>">Password sementara untuk <%= user.username %></label>
+                          <input id="reset-password-<%= user.id %>" name="password" type="text" minlength="8" maxlength="72" placeholder="Password sementara" required>
+                          <button class="user-secondary-button" type="submit">Reset password</button>
+                          <button class="user-secondary-button" type="button" data-generate-password data-target="reset-password-<%= user.id %>">Buat acak</button>
+                        </form>
+                        <form action="<%= adminPath %>/pengguna/<%= user.id %>/status" method="POST">
+                          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                          <input type="hidden" name="is_active" value="<%= user.is_active ? '0' : '1' %>">
+                          <button class="<%= user.is_active ? 'user-danger-button' : 'user-secondary-button' %>" type="submit">
+                            <%= user.is_active ? 'Nonaktifkan' : 'Aktifkan' %>
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+  <script src="/js/user-management.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= isEdit ? 'Edit Berita' : 'Tulis Berita Baru' %> - Panel Redaksi</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
+        Berita OpenSource
+        <span>Panel Redaksi</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="<%= adminPath %>" class="nav-link">
+          📊 Dashboard
+        </a>
+        <a href="<%= adminPath %>/berita" class="nav-link active">
+          📰 Kelola Berita
+        </a>
+        <% if (['owner', 'editor'].includes(currentUser.role)) { %>
+          <a href="<%= adminPath %>/kategori" class="nav-link">
+            📁 Kategori
+          </a>
+        <% } %>
+        <% if (currentUser.role === 'owner') { %>
+          <a href="<%= adminPath %>/pengguna" class="nav-link">
+            👥 Pengguna
+          </a>
+          <a href="<%= adminPath %>/backup" class="nav-link">
+            💾 Backup & Restore
+          </a>
+        <% } %>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <div class="user-badge">
+          <span>Masuk sebagai: <strong><%= currentUser.username %></strong></span>
+          <span class="role-pill role-<%= currentUser.role %>"><%= currentUser.role %></span>
+        </div>
+
+        <form action="<%= adminPath %>/logout" method="POST" style="margin: 0;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn-logout">
+            🚪 Keluar
+          </button>
+        </form>
+      </header>
+
+      <div class="admin-content">
+        <div style="margin-bottom: 2rem;">
+          <a href="<%= adminPath %>/berita" class="btn-sm btn-secondary" style="margin-bottom: 0.75rem;">
+            &larr; Kembali ke Daftar Berita
+          </a>
+          <h1 style="font-size: 1.6rem; font-weight: 800; margin-top: 0.5rem;">
+            <%= isEdit ? 'Edit Naskah Berita' : 'Tulis Naskah Berita Baru' %>
+          </h1>
+        </div>
+
+        <% if (typeof error !== 'undefined' && error) { %>
+          <div class="alert-danger" role="alert">
+            <%= error %>
+          </div>
+        <% } %>
+
+        <form 
+          action="<%= isEdit ? `${adminPath}/berita/edit/${article.id}` : `${adminPath}/berita/tambah` %>" 
+          method="POST" 
+          enctype="multipart/form-data"
+          style="background: var(--admin-card); border: 1px solid var(--admin-border); border-radius: var(--radius); padding: 2rem; max-width: 900px;"
+        >
+          <!-- CSRF Token -->
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+          <!-- 1. Judul Berita -->
+          <div class="form-group">
+            <label for="title" class="form-label">Judul Berita <span style="color:#ef4444;">*</span></label>
+            <input 
+              type="text" 
+              id="title" 
+              name="title" 
+              class="form-input" 
+              placeholder="Contoh: Terobosan Energi Terbarukan Catat Rekor Efisiensi Baru" 
+              value="<%= isEdit ? article.title : '' %>" 
+              required
+            >
+          </div>
+
+          <!-- 2. Kategori & Status (Grid 2 Kolom) -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem;">
+            <div>
+              <label for="category_id" class="form-label">Rubrik Kategori <span style="color:#ef4444;">*</span></label>
+              <select id="category_id" name="category_id" class="form-select" style="width: 100%;" required>
+                <option value="">Pilih Kategori...</option>
+                <% categories.forEach(cat => { %>
+                  <option 
+                    value="<%= cat.id %>" 
+                    <%= isEdit && article.category_id == cat.id ? 'selected' : '' %>
+                  >
+                    <%= cat.name %>
+                  </option>
+                <% }) %>
+              </select>
+            </div>
+
+            <div>
+              <label for="status" class="form-label">Status Penerbitan <span style="color:#ef4444;">*</span></label>
+              <select id="status" name="status" class="form-select" style="width: 100%;" required>
+                <!-- Penulis hanya boleh draft dan diajukan -->
+                <option value="draft" <%= isEdit && article.status === 'draft' ? 'selected' : '' %>>
+                  Draft (Simpan sebagai draf pribadi)
+                </option>
+                <option value="diajukan" <%= isEdit && article.status === 'diajukan' ? 'selected' : '' %>>
+                  Diajukan (Kirim ke Redaksi)
+                </option>
+
+                <!-- Editor dan Owner boleh menerbitkan -->
+                <% if (['editor', 'owner'].includes(currentUser.role)) { %>
+                  <option value="terbit" <%= isEdit && article.status === 'terbit' ? 'selected' : '' %>>
+                    Terbit (Tayangkan ke Publik)
+                  </option>
+                <% } %>
+              </select>
+            </div>
+          </div>
+
+          <!-- 3. Upload Gambar Cover -->
+          <div class="form-group">
+            <label for="image" class="form-label">Gambar Utama / Cover</label>
+            <% if (isEdit && article.image_path) { %>
+              <div style="margin-bottom: 0.75rem; display: flex; align-items: center; gap: 1rem;">
+                <img 
+                  src="<%= article.image_path %>" 
+                  alt="Cover saat ini" 
+                  style="width: 120px; height: 75px; object-fit: cover; border-radius: 6px; border: 1px solid var(--admin-border);"
+                >
+                <span style="font-size: 0.85rem; color: var(--admin-text-muted);">
+                  Gambar saat ini aktif. Unggah file baru di bawah ini hanya jika ingin menggantinya.
+                </span>
+              </div>
+            <% } %>
+
+            <input 
+              type="file" 
+              id="image" 
+              name="image" 
+              class="form-input" 
+              accept="image/jpeg,image/png,image/webp"
+            >
+            <small style="color: var(--admin-text-muted); font-size: 0.8rem; margin-top: 0.35rem; display: block;">
+              Format: JPG, PNG, atau WebP. Ukuran file maksimal 3 MB. Nama file otomatis diacak demi keamanan.
+            </small>
+          </div>
+
+          <!-- 4. Ringkasan Singkat (Lead / Excerpt) -->
+          <div class="form-group">
+            <label for="summary" class="form-label">Ringkasan Berita (Opsional)</label>
+            <textarea 
+              id="summary" 
+              name="summary" 
+              class="form-input" 
+              rows="2" 
+              placeholder="Ringkasan 1-2 kalimat untuk kartu headline dan pratinjau..."
+            ><%= isEdit ? (article.summary || '') : '' %></textarea>
+          </div>
+
+          <!-- 5. Isi Artikel dengan Editor Toolbar Sederhana -->
+          <div class="form-group">
+            <label class="form-label">Isi Berita <span style="color:#ef4444;">*</span></label>
+            
+            <!-- Toolbar Editor Teks -->
+            <div class="editor-toolbar">
+              <button type="button" class="toolbar-btn" data-editor-action="bold" title="Tebal"><strong>B</strong></button>
+              <button type="button" class="toolbar-btn" data-editor-action="italic" title="Miring"><em>I</em></button>
+              <button type="button" class="toolbar-btn" data-editor-action="h2" title="Subjudul 2">H2</button>
+              <button type="button" class="toolbar-btn" data-editor-action="h3" title="Subjudul 3">H3</button>
+              <button type="button" class="toolbar-btn" data-editor-action="p" title="Paragraf">&para;</button>
+              <button type="button" class="toolbar-btn" data-editor-action="ul" title="Daftar Bullet">&bull; List</button>
+              <button type="button" class="toolbar-btn" data-editor-action="ol" title="Daftar Angka">1. List</button>
+              <button type="button" class="toolbar-btn" data-editor-action="link" title="Sisipkan Tautan">&#128279; Link</button>
+              <button type="button" class="toolbar-btn" data-editor-action="quote" title="Kutipan">&ldquo; Kutip</button>
+            </div>
+
+            <textarea 
+              id="article-content" 
+              name="content" 
+              class="editor-textarea" 
+              placeholder="Tuliskan naskah liputan berita lengkap di sini..." 
+              required
+            ><%= isEdit ? article.content : '' %></textarea>
+            
+            <small style="color: var(--admin-text-muted); font-size: 0.8rem; margin-top: 0.35rem; display: block;">
+              Format HTML aman didukung. Konten secara otomatis disanitasi menggunakan <code>sanitize-html</code> sebelum disimpan.
+            </small>
+          </div>
+
+          <!-- 6. Tag Berita -->
+          <div class="form-group" style="margin-bottom: 2rem;">
+            <label for="tags" class="form-label">Tag Topik (Pisahkan dengan koma)</label>
+            <input 
+              type="text" 
+              id="tags" 
+              name="tags" 
+              class="form-input" 
+              placeholder="Contoh: Energi Terbarukan, Inovasi, Sains" 
+              value="<%= isEdit ? article.tagsString : '' %>"
+            >
+          </div>
+
+          <!-- Tombol Simpan -->
+          <div style="display: flex; gap: 1rem;">
+            <button type="submit" class="btn-primary" style="width: auto; padding: 0.75rem 2rem;">
+              💾 <%= isEdit ? 'Simpan Perubahan' : 'Terbitkan / Simpan Naskah' %>
+            </button>
+            <a href="<%= adminPath %>/berita" class="btn-sm btn-secondary" style="display: flex; align-items: center;">
+              Batal
+            </a>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <!-- Skrip Toolbar Editor -->
+  <script src="/js/editor.js"></script>
+</body>
+</html>

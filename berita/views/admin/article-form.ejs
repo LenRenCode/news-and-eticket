@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= article ? 'Edit Berita' : 'Tulis Berita' %> - Berita OpenSource</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <%- include('_nav', { adminPath, currentUser, csrfToken }) %>
+    <main class="admin-main">
+      <header class="admin-topbar"><h1><%= article ? 'Edit Berita' : 'Tulis Berita' %></h1></header>
+      <section class="admin-content">
+        <form class="editor-form" action="<%= adminPath %>/berita<%= article ? `/${article.id}` : '' %>" method="POST" enctype="multipart/form-data" data-article-editor>
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <% if (error) { %><p class="alert-danger" role="alert"><%= error %></p><% } %>
+
+          <label for="title">Judul</label>
+          <input id="title" name="title" type="text" maxlength="200" value="<%= article?.title || '' %>" required>
+
+          <label for="category_id">Kategori</label>
+          <select id="category_id" name="category_id" required>
+            <option value="">Pilih kategori</option>
+            <% categories.forEach((category) => { %>
+              <option value="<%= category.id %>" <%= Number(article?.category_id) === category.id ? 'selected' : '' %>><%= category.name %></option>
+            <% }); %>
+          </select>
+
+          <label for="status">Status</label>
+          <select id="status" name="status" required>
+            <% statuses.forEach((status) => { %>
+              <option value="<%= status %>" <%= article?.status === status ? 'selected' : '' %>><%= status %></option>
+            <% }); %>
+          </select>
+
+          <label for="summary">Ringkasan <span class="field-note">(opsional, maks. 500 karakter)</span></label>
+          <textarea id="summary" name="summary" maxlength="500" rows="3"><%= article?.summary || '' %></textarea>
+
+          <label for="image">Gambar utama <span class="field-note">(JPG, PNG, WEBP; maks. 3 MB)</span></label>
+          <% if (article?.image_path) { %><img class="editor-image-preview" src="<%= article.image_path %>" alt="Gambar artikel saat ini"><% } %>
+          <input id="image" name="image" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+
+          <label>Isi berita</label>
+          <div class="editor-toolbar" role="toolbar" aria-label="Format isi berita">
+            <button type="button" data-command="bold" aria-label="Tebal"><strong>B</strong></button>
+            <button type="button" data-command="italic" aria-label="Miring"><em>I</em></button>
+            <button type="button" data-command="formatBlock" data-value="h2">Judul 2</button>
+            <button type="button" data-command="formatBlock" data-value="h3">Judul 3</button>
+            <button type="button" data-command="insertUnorderedList">Daftar</button>
+            <button type="button" data-command="insertOrderedList">Daftar bernomor</button>
+            <button type="button" data-command="createLink">Tautan</button>
+          </div>
+          <div class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-editor-content><%- article?.content || '' %></div>
+          <input type="hidden" name="content" data-editor-source value="<%= article?.content || '' %>">
+
+          <label for="tags">Tag <span class="field-note">(pisahkan dengan koma)</span></label>
+          <input id="tags" name="tags" type="text" value="<%= Array.isArray(article?.tags) ? article.tags.join(', ') : (article?.tags || '') %>" placeholder="contoh: Politik, Ekonomi, Indonesia">
+
+          <div class="editor-actions">
+            <button type="submit" class="btn-primary"><%= article ? 'Simpan Perubahan' : 'Simpan Berita' %></button>
+            <a href="<%= adminPath %>/berita" class="cancel-link">Batal</a>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+  <script src="/js/article-editor.js" defer></script>
+</body>
+</html>

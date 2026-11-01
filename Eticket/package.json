@@ -1,0 +1,12 @@
+{
+  "name": "eticket-qris",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @eticket/web dev",
+    "dev:api": "pnpm --filter @eticket/api dev",
+    "db:generate": "pnpm --filter @eticket/database db:generate",
+    "db:migrate": "pnpm --filter @eticket/database db:migrate"
+  }
+}

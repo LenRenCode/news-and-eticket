@@ -1,0 +1,90 @@
+<%- include('../layouts/header', { 
+  title: article.title, 
+  metaDescription: article.summary || article.title,
+  activeCategory: article.category_slug, 
+  categories 
+}) %>
+
+<article class="article-detail">
+  <!-- Header Artikel -->
+  <header class="article-header">
+    <% if (article.category_name) { %>
+      <a href="/kategori/<%= article.category_slug %>" class="category-badge">
+        <%= article.category_name %>
+      </a>
+    <% } %>
+
+    <h1 class="article-headline-title"><%= article.title %></h1>
+
+    <% if (article.summary) { %>
+      <p class="article-lead"><%= article.summary %></p>
+    <% } %>
+
+    <div class="article-meta">
+      <span class="meta-author">Penulis: <strong><%= article.author_name || 'Redaksi' %></strong></span>
+      <span class="separator">&bull;</span>
+      <time datetime="<%= article.published_at || article.created_at %>">
+        <%= formatDateIndo(article.published_at || article.created_at) %>
+      </time>
+      <span class="separator">&bull;</span>
+      <span>👁️ Dibaca <strong><%= article.views %></strong> kali</span>
+    </div>
+  </header>
+
+  <!-- Gambar Utama -->
+  <figure class="article-featured-image">
+    <img 
+      src="<%= article.image_path || '/images/default-article.svg' %>" 
+      alt="<%= article.title %>"
+    >
+  </figure>
+
+  <!-- Isi Konten Artikel -->
+  <div class="article-body">
+    <%- article.content %>
+  </div>
+
+  <!-- Tag Artikel -->
+  <% if (article.tags && article.tags.length > 0) { %>
+    <section class="article-tags-section" aria-label="Tag Berita">
+      <span class="tag-label">Topik Terkait:</span>
+      <% article.tags.forEach(tag => { %>
+        <span class="tag-pill">#<%= tag.name %></span>
+      <% }) %>
+    </section>
+  <% } %>
+
+  <!-- Berita Terkait -->
+  <% if (relatedArticles && relatedArticles.length > 0) { %>
+    <section class="related-section">
+      <div class="section-header">
+        <h2 class="section-title">Berita Terkait</h2>
+      </div>
+
+      <div class="related-grid">
+        <% relatedArticles.forEach(item => { %>
+          <article class="article-card">
+            <a href="/artikel/<%= item.slug %>" class="card-image-wrapper">
+              <img 
+                src="<%= item.image_path || '/images/default-article.svg' %>" 
+                alt="<%= item.title %>" 
+                class="card-image"
+                loading="lazy"
+              >
+            </a>
+            <div class="card-content">
+              <h3 class="card-title" style="font-size: 1rem;">
+                <a href="/artikel/<%= item.slug %>"><%= item.title %></a>
+              </h3>
+              <div class="article-meta" style="font-size: 0.78rem;">
+                <span><%= formatDateIndo(item.published_at || item.created_at) %></span>
+              </div>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+</article>
+
+<%- include('../layouts/footer', { categories }) %>

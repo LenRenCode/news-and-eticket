@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Berita OpenSource - Status Sistem</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; }
+    main { background: #1e293b; padding: 1.5rem; border-radius: 8px; max-width: 650px; margin: 0 auto; }
+    h1 { color: #38bdf8; margin-top: 0; }
+    ul { line-height: 1.6; }
+    .badge { background: #0284c7; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; }
+    .success { color: #4ade80; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Berita OpenSource - Tahap 1 Selesai</h1>
+    <p class="success">Database SQLite aktif, folder data terinisialisasi, dan data awal tersedia.</p>
+
+    <h2>Kategori Terdaftar (<%= categories.length %>)</h2>
+    <ul>
+      <% categories.forEach((category) => { %>
+        <li><strong><%= category.name %></strong> (slug: <code><%= category.slug %></code>)</li>
+      <% }); %>
+    </ul>
+
+    <h2>Pengguna Awal Terdaftar (<%= users.length %>)</h2>
+    <ul>
+      <% users.forEach((user) => { %>
+        <li>
+          Username: <strong><%= user.username %></strong> |
+          Role: <span class="badge"><%= user.role %></span> |
+          Ganti Password: <code><%= user.must_change_password ? 'YA (Wajib)' : 'TIDAK' %></code>
+        </li>
+      <% }); %>
+    </ul>
+
+    <h2>Total Artikel: <strong><%= articlesCount %></strong></h2>
+  </main>
+</body>
+</html>

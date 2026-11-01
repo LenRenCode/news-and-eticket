@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Panel Redaksi</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1 class="auth-title">Panel Redaksi</h1>
+        <p class="auth-subtitle">Silakan masuk menggunakan kredensial akun Anda</p>
+      </div>
+
+      <% if (typeof error !== 'undefined' && error) { %>
+        <div class="alert-danger" role="alert">
+          <%= error %>
+        </div>
+      <% } %>
+
+      <form action="<%= adminPath %>" method="POST">
+        <!-- Token Proteksi CSRF -->
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="form-group">
+          <label for="username" class="form-label">Username</label>
+          <input 
+            type="text" 
+            id="username" 
+            name="username" 
+            class="form-input" 
+            placeholder="Masukkan username" 
+            required 
+            autocomplete="username"
+            autofocus
+          >
+        </div>
+
+        <div class="form-group" style="margin-bottom: 2rem;">
+          <label for="password" class="form-label">Password</label>
+          <input 
+            type="password" 
+            id="password" 
+            name="password" 
+            class="form-input" 
+            placeholder="Masukkan password" 
+            required 
+            autocomplete="current-password"
+          >
+        </div>
+
+        <button type="submit" class="btn-primary">
+          Masuk ke Panel
+        </button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

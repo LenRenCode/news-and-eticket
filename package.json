@@ -1,0 +1,15 @@
+{
+  "name": "portal-berita-tiket",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portal Berita Terpadu dan Sistem Pemesanan E-Tiket Bus Antar Kota",
+  "scripts": {
+    "dev:all": "APP_MODE=demo concurrently -n \"berita,web,api\" -c \"blue,green,magenta\" \"npm run dev --prefix berita\" \"npm run dev --prefix Eticket/apps/web\" \"npm run dev --prefix Eticket/apps/api\"",
+    "build": "npm run build --prefix Eticket/apps/web && npm run build --prefix Eticket/apps/api",
+    "test": "npm run build && node --test Eticket/apps/api/tests/*.test.cjs",
+    "start:all": "npm run build && APP_MODE=${APP_MODE:-production} concurrently -n \"berita,web,api\" -c \"blue,green,magenta\" \"npm start --prefix berita\" \"npm start --prefix Eticket/apps/web\" \"npm start --prefix Eticket/apps/api\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

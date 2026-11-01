@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+
+# Build artifacts
+dist/
+
+# Environment files
+.env*
+!**/.env.example
+
+# Local SQLite databases and uploads
+berita/data/
+
+# Local archives and API session data
+*.zip
+**/sessions.db

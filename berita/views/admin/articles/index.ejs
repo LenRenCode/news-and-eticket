@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kelola Berita - Panel Redaksi</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
+        Berita OpenSource
+        <span>Panel Redaksi</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="<%= adminPath %>" class="nav-link">
+          📊 Dashboard
+        </a>
+        <a href="<%= adminPath %>/berita" class="nav-link active">
+          📰 Kelola Berita
+        </a>
+        <% if (['owner', 'editor'].includes(currentUser.role)) { %>
+          <a href="<%= adminPath %>/kategori" class="nav-link">
+            📁 Kategori
+          </a>
+        <% } %>
+        <% if (currentUser.role === 'owner') { %>
+          <a href="<%= adminPath %>/pengguna" class="nav-link">
+            👥 Pengguna
+          </a>
+          <a href="<%= adminPath %>/backup" class="nav-link">
+            💾 Backup & Restore
+          </a>
+        <% } %>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <div class="user-badge">
+          <span>Masuk sebagai: <strong><%= currentUser.username %></strong></span>
+          <span class="role-pill role-<%= currentUser.role %>"><%= currentUser.role %></span>
+        </div>
+
+        <form action="<%= adminPath %>/logout" method="POST" style="margin: 0;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn-logout">
+            🚪 Keluar
+          </button>
+        </form>
+      </header>
+
+      <div class="admin-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+          <div>
+            <h1 style="font-size: 1.6rem; font-weight: 800;">Manajemen Berita</h1>
+            <p style="color: var(--admin-text-muted); font-size: 0.9rem;">
+              <%= currentUser.role === 'penulis' ? 'Daftar naskah tulisan Anda.' : 'Semua naskah berita redaksi.' %>
+            </p>
+          </div>
+          <a href="<%= adminPath %>/berita/tambah" class="btn-primary" style="width: auto; padding: 0.6rem 1.2rem;">
+            + Tulis Berita
+          </a>
+        </div>
+
+        <!-- Filter & Search Bar -->
+        <div class="filter-bar">
+          <form action="<%= adminPath %>/berita" method="GET" class="filter-form">
+            <input 
+              type="text" 
+              name="search" 
+              class="form-input" 
+              style="max-width: 280px; padding: 0.55rem 0.9rem;" 
+              placeholder="Cari judul berita..." 
+              value="<%= currentSearch %>"
+            >
+
+            <select name="status" class="form-select" onchange="this.form.submit()">
+              <option value="">Semua Status</option>
+              <option value="draft" <%= currentStatus === 'draft' ? 'selected' : '' %>>Draft</option>
+              <option value="diajukan" <%= currentStatus === 'diajukan' ? 'selected' : '' %>>Diajukan</option>
+              <option value="terbit" <%= currentStatus === 'terbit' ? 'selected' : '' %>>Terbit</option>
+            </select>
+
+            <button type="submit" class="btn-sm btn-secondary">
+              Filter
+            </button>
+
+            <% if (currentSearch || currentStatus) { %>
+              <a href="<%= adminPath %>/berita" class="btn-sm" style="color: var(--admin-text-muted);">
+                Reset
+              </a>
+            <% } %>
+          </form>
+
+          <span style="font-size: 0.88rem; color: var(--admin-text-muted);">
+            Ditemukan: <strong><%= pagination.total %></strong> berita
+          </span>
+        </div>
+
+        <!-- Tabel Berita -->
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 70px;">Cover</th>
+                <th>Judul Berita</th>
+                <th>Kategori</th>
+                <th>Penulis</th>
+                <th>Status</th>
+                <th>Dibaca</th>
+                <th>Tanggal</th>
+                <th style="text-align: right;">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (articles && articles.length > 0) { %>
+                <% articles.forEach(art => { %>
+                  <tr>
+                    <td>
+                      <img 
+                        src="<%= art.image_path || '/images/default-article.svg' %>" 
+                        alt="" 
+                        style="width: 50px; height: 34px; object-fit: cover; border-radius: 4px;"
+                      >
+                    </td>
+                    <td>
+                      <strong style="color: var(--admin-text-main); display: block; max-width: 380px; line-height: 1.35;">
+                        <%= art.title %>
+                      </strong>
+                    </td>
+                    <td>
+                      <span style="color: var(--admin-primary); font-weight: 600; font-size: 0.85rem;">
+                        <%= art.category_name || '-' %>
+                      </span>
+                    </td>
+                    <td><%= art.author_name %></td>
+                    <td>
+                      <span class="status-badge status-<%= art.status %>">
+                        <%= art.status %>
+                      </span>
+                    </td>
+                    <td>👁️ <%= art.views %></td>
+                    <td style="font-size: 0.82rem; color: var(--admin-text-muted);">
+                      <%= formatDateIndo(art.created_at) %>
+                    </td>
+                    <td style="text-align: right;">
+                      <div style="display: inline-flex; gap: 0.4rem; justify-content: flex-end;">
+                        <% if (art.status === 'terbit') { %>
+                          <a href="/artikel/<%= art.slug %>" target="_blank" class="btn-sm btn-secondary" title="Buka di tab baru">
+                            👁️
+                          </a>
+                        <% } %>
+
+                        <!-- Tombol Edit (Penulis hanya untuk miliknya, Editor/Owner untuk semua) -->
+                        <% if (currentUser.role !== 'penulis' || art.author_id === currentUser.id) { %>
+                          <a href="<%= adminPath %>/berita/edit/<%= art.id %>" class="btn-sm btn-secondary" title="Ubah">
+                            ✏️ Edit
+                          </a>
+                        <% } %>
+
+                        <!-- Tombol Hapus (dengan CSRF dan Konfirmasi) -->
+                        <% if (currentUser.role !== 'penulis' || art.author_id === currentUser.id) { %>
+                          <form action="<%= adminPath %>/berita/hapus/<%= art.id %>" method="POST" style="display: inline;" onsubmit="return confirm('Apakah Anda yakin ingin menghapus berita ini?');">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                            <button type="submit" class="btn-sm btn-danger" title="Hapus">
+                              🗑️
+                            </button>
+                          </form>
+                        <% } %>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 3rem; color: var(--admin-text-muted);">
+                    Tidak ada berita yang ditemukan.
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Paginasi Berita Admin -->
+        <% if (pagination.totalPages > 1) { %>
+          <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1.5rem;">
+            <% if (pagination.hasPrev) { %>
+              <a href="<%= adminPath %>/berita?page=<%= pagination.page - 1 %>&search=<%= encodeURIComponent(currentSearch) %>&status=<%= currentStatus %>" class="btn-sm btn-secondary">
+                &larr; Sebelumnya
+              </a>
+            <% } %>
+
+            <span style="font-size: 0.88rem; padding: 0.45rem 0.75rem; color: var(--admin-text-muted);">
+              Halaman <%= pagination.page %> dari <%= pagination.totalPages %>
+            </span>
+
+            <% if (pagination.hasNext) { %>
+              <a href="<%= adminPath %>/berita?page=<%= pagination.page + 1 %>&search=<%= encodeURIComponent(currentSearch) %>&status=<%= currentStatus %>" class="btn-sm btn-secondary">
+                Selanjutnya &rarr;
+              </a>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

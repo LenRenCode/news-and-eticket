@@ -1,0 +1,26 @@
+<aside class="admin-sidebar">
+  <a class="sidebar-brand" href="<%= adminPath %>/dashboard">
+    Berita OpenSource
+    <span>Panel Redaksi</span>
+  </a>
+  <nav class="sidebar-nav" aria-label="Navigasi panel">
+    <a class="nav-link" href="<%= adminPath %>/dashboard">Dashboard</a>
+    <a class="nav-link" href="<%= adminPath %>/berita">Berita</a>
+    <a class="nav-link" href="<%= adminPath %>/berita/tulis">Tulis Berita</a>
+    <% if (['owner', 'editor'].includes(currentUser.role)) { %>
+      <a class="nav-link" href="<%= adminPath %>/kategori">Kategori</a>
+    <% } %>
+    <% if (currentUser.role === 'owner') { %>
+      <a class="nav-link" href="<%= adminPath %>/pengguna">Pengguna</a>
+      <a class="nav-link" href="<%= adminPath %>/backup">Backup</a>
+    <% } %>
+  </nav>
+  <div class="sidebar-footer">
+    <span><strong><%= currentUser.username %></strong> · <%= currentUser.role %></span>
+    <form action="<%= adminPath %>/logout" method="POST">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button class="btn-logout" type="submit">Keluar</button>
+    </form>
+    <a href="/">Lihat halaman publik</a>
+  </div>
+</aside>

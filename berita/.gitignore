@@ -1,0 +1,12 @@
+# Environment & rahasia
+.env
+
+# Dependencies
+node_modules/
+
+# Data portabel (database, upload gambar, backup zip, sesi)
+data/
+
+# Logs & temp
+*.log
+.DS_Store

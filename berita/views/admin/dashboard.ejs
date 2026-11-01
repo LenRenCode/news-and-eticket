@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Panel Redaksi Berita OpenSource</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <%- include('_nav', { adminPath, currentUser, csrfToken }) %>
+
+    <!-- Konten Utama Admin -->
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <h1>Dashboard</h1>
+        <a class="btn-primary btn-inline" href="<%= adminPath %>/berita/tulis">Tulis berita</a>
+      </header>
+
+      <div class="admin-content">
+        <div class="dashboard-intro">
+          <div>
+            <h2>Ringkasan Redaksi</h2>
+            <p>Pantau produktivitas penerbitan berita dan interaksi pembaca hari ini.</p>
+          </div>
+        </div>
+
+        <!-- Grid Statistik Dashboard -->
+        <div class="stats-grid">
+          <!-- 1. Total Berita -->
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Total Berita</span>
+              <span class="stat-icon">📚</span>
+            </div>
+            <div class="stat-value"><%= stats.totalArticles %></div>
+          </div>
+
+          <!-- 2. Draft -->
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Draft</span>
+              <span class="stat-icon">📝</span>
+            </div>
+            <div class="stat-value"><%= stats.draftArticles %></div>
+          </div>
+
+          <!-- 3. Diajukan (Menunggu Review) -->
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Diajukan</span>
+              <span class="stat-icon">⏳</span>
+            </div>
+            <div class="stat-value" style="color: #fbbf24;"><%= stats.submittedArticles %></div>
+          </div>
+
+          <!-- 4. Dibaca Hari Ini -->
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Dibaca Hari Ini</span>
+              <span class="stat-icon">🔥</span>
+            </div>
+            <div class="stat-value" style="color: #38bdf8;"><%= stats.todayViews %></div>
+          </div>
+        </div>
+
+        <!-- Seksi Shortcut Cepat -->
+        <div class="dashboard-shortcuts">
+          <div style="background: var(--admin-card); border: 1px solid var(--admin-border); border-radius: var(--radius); padding: 1.5rem;">
+            <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem;">Aksi Cepat Berita</h3>
+            <p style="color: var(--admin-text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">
+              Mulai membuat draf tulisan baru, mengajukan naskah ke redaksi, atau mengelola publikasi artikel.
+            </p>
+            <div style="display: flex; gap: 0.75rem;">
+              <a href="<%= adminPath %>/berita/tambah" class="btn-sm btn-secondary">
+                + Tulis Baru
+              </a>
+              <a href="<%= adminPath %>/berita" class="btn-sm btn-secondary">
+                Lihat Semua Berita &rarr;
+              </a>
+            </div>
+          </div>
+
+          <% if (['owner', 'editor'].includes(currentUser.role)) { %>
+            <div style="background: var(--admin-card); border: 1px solid var(--admin-border); border-radius: var(--radius); padding: 1.5rem;">
+              <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem;">Kelola Rubrik Kategori</h3>
+              <p style="color: var(--admin-text-muted); font-size: 0.9rem; margin-bottom: 1.25rem;">
+                Atur pengelompokan rubrik berita agar pembaca dapat menelusuri artikel dengan mudah.
+              </p>
+              <a href="<%= adminPath %>/kategori" class="btn-sm btn-secondary">
+                Buka Menu Kategori &rarr;
+              </a>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

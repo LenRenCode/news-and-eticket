@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+  NEEDS_REFUND
+
+  @@map("payment_status")
+}
+
+enum AttendanceStatus {
+  AVAILABLE
+  SCANNED
+
+  @@map("attendance_status")
+}
+
+model KuotaTiket {
+  id            Int           @id @default(autoincrement())
+  namaEvent     String        @default("Samarinda - Penajam") @map("nama_event") @db.VarChar(150)
+  kategori      String        @default("Bus demo") @db.VarChar(100)
+  harga         Decimal       @default(150000.00) @db.Decimal(12, 2)
+  totalKuota    Int           @default(40) @map("total_kuota")
+  kuotaTerjual  Int           @default(0) @map("kuota_terjual")
+  kuotaTerpesan Int           @default(0) @map("kuota_terpesan")
+  isActive      Boolean       @default(true) @map("is_active")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+  transaksi     Transaksi[]
+
+  @@map("kuota_tiket")
+}
+
+model Pembeli {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nama        String        @db.VarChar(150)
+  email       String        @db.VarChar(150)
+  noWhatsapp  String        @map("no_whatsapp") @db.VarChar(25)
+  transaksi   Transaksi[]
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([email])
+  @@index([noWhatsapp])
+  @@map("pembeli")
+}
+
+model Transaksi {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kodeTransaksi   String        @unique @map("kode_transaksi") @db.VarChar(50)
+  pembeliId       String        @map("pembeli_id") @db.Uuid
+  kuotaId         Int           @map("kuota_id")
+  jumlahTiket     Int           @map("jumlah_tiket")
+  hargaSatuan     Decimal       @map("harga_satuan") @db.Decimal(12, 2)
+  totalBayar      Decimal       @map("total_bayar") @db.Decimal(12, 2)
+  statusPembayaran PaymentStatus @default(PENDING) @map("status_pembayaran")
+  gatewayOrderId  String?       @unique @map("gateway_order_id") @db.VarChar(100)
+  qrisPayload     String?       @map("qris_payload") @db.Text
+  qrisUrl         String?       @map("qris_url") @db.Text
+  expiredAt       DateTime      @map("expired_at") @db.Timestamptz()
+  paidAt          DateTime?     @map("paid_at") @db.Timestamptz()
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  pembeli         Pembeli       @relation(fields: [pembeliId], references: [id], onDelete: Restrict)
+  kuotaTiket      KuotaTiket    @relation(fields: [kuotaId], references: [id], onDelete: Restrict)
+  tiket           Tiket[]
+  reservasiKursi  ReservasiKursi[]
+
+  @@index([pembeliId])
+  @@index([statusPembayaran, createdAt])
+  @@index([gatewayOrderId])
+  @@map("transaksi")
+}
+
+model Tiket {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transaksiId      String           @map("transaksi_id") @db.Uuid
+  kodeTiket        String           @unique @map("kode_tiket") @db.VarChar(50)
+  statusKehadiran  AttendanceStatus @default(AVAILABLE) @map("status_kehadiran")
+  waktuScan        DateTime?        @map("waktu_scan") @db.Timestamptz()
+  scannedBy        String?          @map("scanned_by") @db.VarChar(100)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  transaksi        Transaksi        @relation(fields: [transaksiId], references: [id], onDelete: Cascade)
+
+  @@index([transaksiId])
+  @@index([statusKehadiran])
+  @@map("tiket")
+}
+
+model ReservasiKursi {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transaksiId String    @map("transaksi_id") @db.Uuid
+  kuotaId     Int       @map("kuota_id")
+  travelDate  DateTime  @default(dbgenerated("CURRENT_DATE")) @map("travel_date") @db.Date
+  seatNo      String    @map("seat_no") @db.VarChar(10)
+  status      String    @default("PENDING") @db.VarChar(20)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  transaksi   Transaksi @relation(fields: [transaksiId], references: [id], onDelete: Cascade)
+
+  @@unique([kuotaId, travelDate, seatNo], name: "uq_seat_reservation")
+  @@index([kuotaId, travelDate, status])
+  @@map("reservasi_kursi")
+}
