@@ -32,7 +32,26 @@ const ticketWebProxy = createProxyMiddleware({
   xfwd: true,
   ws: true,
   on: {
-    proxyReq: fixRequestBody
+    proxyReq: fixRequestBody,
+    proxyRes: (proxyRes) => {
+      const location = proxyRes.headers.location;
+      if (
+        proxyRes.statusCode &&
+        proxyRes.statusCode >= 300 &&
+        proxyRes.statusCode < 400 &&
+        typeof location === 'string' &&
+        new URL(
+          location,
+          process.env.ETICKET_WEB_URL || 'http://127.0.0.1:3001'
+        ).pathname.toLowerCase().startsWith('/tiket/admin')
+      ) {
+        const redirect = new URL(
+          location,
+          process.env.ETICKET_WEB_URL || 'http://127.0.0.1:3001'
+        );
+        proxyRes.headers.location = `${redirect.pathname}${redirect.search}${redirect.hash}`;
+      }
+    }
   }
 });
 

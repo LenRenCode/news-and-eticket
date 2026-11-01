@@ -109,7 +109,10 @@ export class ReportService {
         COALESCE(t.status_kehadiran::text, 'BELUM TERBIT') AS "Status Kehadiran",
         t.waktu_scan AS "Waktu Check-In",
         t.scanned_by AS "Petugas Gate",
-        tr.total_bayar::numeric AS "Total Bayar (IDR)"
+        tr.total_bayar::numeric AS "Total Bayar (IDR)",
+        COALESCE(tr.refund_notes, '-') AS "Catatan Refund",
+        tr.refunded_at AS "Waktu Refund",
+        COALESCE(tr.refunded_by, '-') AS "Operator Refund"
       FROM transaksi tr
       JOIN pembeli p ON tr.pembeli_id = p.id
       JOIN kuota_tiket k ON tr.kuota_id = k.id

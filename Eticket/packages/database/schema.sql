@@ -13,6 +13,7 @@ EXCEPTION
 END $$;
 
 ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'NEEDS_REFUND';
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'REFUNDED';
 
 DO $$ BEGIN
     CREATE TYPE attendance_status AS ENUM ('AVAILABLE', 'SCANNED');
@@ -93,6 +94,9 @@ CREATE TABLE IF NOT EXISTS transaksi (
     qris_payload TEXT,          -- Payload mentah QRIS (00020101021226...)
     qris_url TEXT,              -- URL gambar barcode jika disediakan gateway
     travel_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    refund_notes TEXT,
+    refunded_at TIMESTAMPTZ,
+    refunded_by VARCHAR(100),
     expired_at TIMESTAMPTZ NOT NULL,
     paid_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -101,6 +105,12 @@ CREATE TABLE IF NOT EXISTS transaksi (
 
 ALTER TABLE transaksi
     ADD COLUMN IF NOT EXISTS travel_date DATE NOT NULL DEFAULT CURRENT_DATE;
+ALTER TABLE transaksi
+    ADD COLUMN IF NOT EXISTS refund_notes TEXT;
+ALTER TABLE transaksi
+    ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
+ALTER TABLE transaksi
+    ADD COLUMN IF NOT EXISTS refunded_by VARCHAR(100);
 
 CREATE INDEX IF NOT EXISTS idx_transaksi_pembeli_id ON transaksi(pembeli_id);
 CREATE INDEX IF NOT EXISTS idx_transaksi_status_created ON transaksi(status_pembayaran, created_at);

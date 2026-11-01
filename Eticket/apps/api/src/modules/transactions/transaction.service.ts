@@ -267,7 +267,8 @@ export class TransactionService {
    */
   static async confirmPaymentAndIssueTickets(
     orderIdOrTrxId: string,
-    gatewayOrderId?: string
+    gatewayOrderId?: string,
+    expectedGrossAmount?: number | string
   ) {
     return await withTransaction(async (client: PoolClient) => {
       // 1. Kunci baris transaksi (Row Locking untuk idempoten)
@@ -297,6 +298,30 @@ export class TransactionService {
       }
 
       const trx = trxResult.rows[0];
+
+      // Verifikasi kesesuaian jumlah nominal pembayaran jika disertakan
+      if (
+        expectedGrossAmount !== undefined &&
+        expectedGrossAmount !== null &&
+        expectedGrossAmount !== ""
+      ) {
+        const expected = Number(expectedGrossAmount);
+        const actual = Number(trx.total_bayar);
+        if (!Number.isNaN(expected) && Math.abs(actual - expected) > 0.01) {
+          throw new Error(
+            `Gross amount mismatch: transaksi sebesar ${actual}, callback gateway sebesar ${expected}`
+          );
+        }
+      }
+
+      // Idempoten jika sudah REFUNDED
+      if (trx.status_pembayaran === "REFUNDED") {
+        return {
+          status: "ALREADY_REFUNDED",
+          transaksiId: trx.id,
+          kodeTransaksi: trx.kode_transaksi,
+        };
+      }
 
       // Idempoten: Jika sudah PAID, kembalikan tiket yang sudah diterbitkan
       if (trx.status_pembayaran === "PAID") {
@@ -487,6 +512,80 @@ export class TransactionService {
       throw new Error("Tiket dengan ID tersebut tidak ditemukan");
     }
     return res.rows[0];
+  }
+
+  /**
+   * Tandai transaksi NEEDS_REFUND menjadi REFUNDED (Aksi Admin)
+   * Idempoten, mencatat jejak waktu dan nama operator.
+   */
+  static async markAsRefunded(
+    orderIdOrTrxId: string,
+    notes?: string,
+    operatorName: string = "Admin"
+  ) {
+    return await withTransaction(async (client: PoolClient) => {
+      const trxQuery = `
+        SELECT id, kode_transaksi, status_pembayaran, refund_notes, refunded_at, refunded_by
+        FROM transaksi
+        WHERE id::text = $1 OR kode_transaksi = $1 OR gateway_order_id = $1
+        FOR UPDATE OF transaksi;
+      `;
+      const trxResult = await client.query(trxQuery, [orderIdOrTrxId]);
+
+      if (trxResult.rows.length === 0) {
+        throw new Error(`Transaksi dengan identifier ${orderIdOrTrxId} tidak ditemukan`);
+      }
+
+      const trx = trxResult.rows[0];
+
+      // Idempoten: Jika sudah REFUNDED, kembalikan detail yang ada
+      if (trx.status_pembayaran === "REFUNDED") {
+        return {
+          success: true,
+          status: "REFUNDED",
+          alreadyRefunded: true,
+          transaksiId: trx.id,
+          kodeTransaksi: trx.kode_transaksi,
+          notes: trx.refund_notes || null,
+          refundedAt: trx.refunded_at ? new Date(trx.refunded_at).toISOString() : null,
+          refundedBy: trx.refunded_by || null,
+        };
+      }
+
+      if (trx.status_pembayaran !== "NEEDS_REFUND") {
+        throw new Error(
+          `Hanya transaksi berstatus NEEDS_REFUND yang dapat ditandai REFUNDED (status saat ini: ${trx.status_pembayaran})`
+        );
+      }
+
+      const updateResult = await client.query(
+        `
+        UPDATE transaksi
+        SET status_pembayaran = 'REFUNDED',
+            refund_notes = $1,
+            refunded_at = NOW(),
+            refunded_by = $2,
+            updated_at = NOW()
+        WHERE id = $3
+        RETURNING id, kode_transaksi, status_pembayaran, refund_notes, refunded_at, refunded_by;
+        `,
+        [notes || null, operatorName, trx.id]
+      );
+
+      const updated = updateResult.rows[0];
+      return {
+        success: true,
+        status: "REFUNDED",
+        alreadyRefunded: false,
+        transaksiId: updated.id,
+        kodeTransaksi: updated.kode_transaksi,
+        notes: updated.refund_notes,
+        refundedAt: updated.refunded_at
+          ? new Date(updated.refunded_at).toISOString()
+          : new Date().toISOString(),
+        refundedBy: updated.refunded_by,
+      };
+    });
   }
 }
 

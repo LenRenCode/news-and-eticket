@@ -202,11 +202,23 @@ app.post("/api/payments/webhook", async (req: Request, res: Response) => {
       (transactionStatus === "capture" && fraudStatus === "accept");
 
     if (isSuccess) {
-      await TransactionService.confirmPaymentAndIssueTickets(
-        orderId,
-        notification.transaction_id
-      );
-      console.log(`[Webhook Success] Pembayaran untuk ${orderId} terverifikasi lunas.`);
+      try {
+        await TransactionService.confirmPaymentAndIssueTickets(
+          orderId,
+          notification.transaction_id,
+          grossAmount
+        );
+        console.log(`[Webhook Success] Pembayaran untuk ${orderId} terverifikasi lunas.`);
+      } catch (err: any) {
+        console.error(`[Webhook Rejection] ${err.message}`);
+        if (err.message && err.message.includes("tidak ditemukan")) {
+          return res.status(404).json({ status: "Error", message: err.message });
+        }
+        if (err.message && err.message.includes("Gross amount mismatch")) {
+          return res.status(400).json({ status: "Error", message: err.message });
+        }
+        throw err;
+      }
     }
 
     res.status(200).json({ status: "OK" });
@@ -322,3 +334,31 @@ app.get("/api/reports/export-excel", requireAdmin, async (_req: Request, res: Re
     });
   }
 });
+
+// -----------------------------------------------------------------------------
+// 7. AKSI ADMIN: REFUND TRANSAKSI (NEEDS_REFUND -> REFUNDED)
+// -----------------------------------------------------------------------------
+app.post(
+  "/api/admin/transactions/:id/refund",
+  requireSameOrigin,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { notes, operator } = req.body || {};
+      const result = await TransactionService.markAsRefunded(
+        String(id),
+        notes,
+        operator || "Admin"
+      );
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Admin Refund Error]", error);
+      const isNotFound = error.message?.includes("tidak ditemukan");
+      res.status(isNotFound ? 404 : 400).json({
+        success: false,
+        error: error.message || "Gagal memproses refund transaksi",
+      });
+    }
+  }
+);

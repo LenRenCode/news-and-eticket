@@ -1265,3 +1265,15 @@ img {
   }
 }
 
+@media (max-width: 480px) {
+  .btn-beli-tiket {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.78rem;
+    gap: 0.25rem;
+  }
+  .header-actions {
+    gap: 0.5rem;
+  }
+}
+
+

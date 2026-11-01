@@ -163,7 +163,7 @@ Jangan commit `.env` atau memasukkan server key/SMTP credential ke variabel `NEX
 - Rute, jadwal, tarif, kapasitas, dan pilihan kursi pada demo belum terhubung ke operator bus. Kursi hanya disimpan di browser, bukan reservasi terjamin pada server.
 - Integrasikan operator dan simpan/reservasi kursi di backend sebelum menerima pemesanan perjalanan nyata.
 
-- `/api/payments/simulate-success/:id` hanya tersedia di luar production dan memerlukan sesi admin. Saat `PAYMENT_API_KEY` kosong, verifikasi signature webhook saat ini dilewati; konfigurasi kredensial Midtrans produksi sebelum menerima pembayaran nyata.
+- `/api/payments/simulate-success/:id` hanya tersedia di luar production dan memerlukan sesi admin. Dalam production, `PAYMENT_API_KEY` wajib tersedia dan webhook dengan signature kosong atau tidak valid ditolak (`401`); siapkan kredensial Midtrans sebelum menerima pembayaran nyata.
 - Fallback in-memory ditujukan untuk pengembangan dan tidak mempertahankan data setelah proses berhenti. Pastikan PostgreSQL dan tabel sudah benar sebelum pengujian integrasi/produksi.
 - Skema Prisma sudah tersedia, tetapi migrasi belum disimpan ke repository. Tinjau hasil migrasi dan seed kuota acara pada database sebelum menjalankan aplikasi.
 - Login admin memakai satu akun dari environment dan cookie sesi HttpOnly berdurasi delapan jam; siapkan password dan secret yang berbeda/kuat untuk setiap deployment. Web dan API perlu berada pada origin yang sama atau subdomain satu situs agar kebijakan cookie SameSite=Lax berfungsi.

@@ -58,9 +58,9 @@ Sesuaikan konfigurasi di dalam file `.env`:
 PORT=3000
 DATA_DIR=./data
 ADMIN_PATH=admin
-SESSION_SECRET=kunci_rahasia_sesi_berita_opensource_acak_dan_panjang_minimal_32_karakter
-OWNER_USERNAME=<set-unique-owner-name>
-OWNER_PASSWORD=<set-unique-strong-password>
+SESSION_SECRET=
+OWNER_USERNAME=
+OWNER_PASSWORD=
 ```
 
 ### 3. Menjalankan Server

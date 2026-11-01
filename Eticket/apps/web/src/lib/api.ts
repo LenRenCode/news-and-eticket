@@ -70,5 +70,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ ticketUuid, scannedBy }),
     }),
+  refundTransaction: (id: string, notes?: string, operator?: string) =>
+    fetchApi(`/admin/transactions/${id}/refund`, {
+      method: "POST",
+      body: JSON.stringify({ notes, operator }),
+    }),
   getExportExcelUrl: () => `${API_BASE_URL}/reports/export-excel`,
 };

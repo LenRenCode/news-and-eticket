@@ -30,7 +30,10 @@ export interface TransaksiRecord {
   jumlah_tiket: number;
   harga_satuan: number;
   total_bayar: number;
-  status_pembayaran: "PENDING" | "PAID" | "FAILED" | "EXPIRED" | "NEEDS_REFUND";
+  status_pembayaran: "PENDING" | "PAID" | "FAILED" | "EXPIRED" | "NEEDS_REFUND" | "REFUNDED";
+  refund_notes?: string | null;
+  refunded_at?: Date | null;
+  refunded_by?: string | null;
   gateway_order_id: string | null;
   qris_payload: string | null;
   qris_url: string | null;
@@ -290,6 +293,38 @@ export async function executeMemoryQuery(
   }
 
   if (
+    normalizedSql.includes("UPDATE transaksi") &&
+    normalizedSql.includes("status_pembayaran = 'REFUNDED'")
+  ) {
+    const notes = params[0] ? String(params[0]) : null;
+    const operator = params[1] ? String(params[1]) : "Admin";
+    const trxId = String(params[2]);
+    const transaction = transaksiTable.find(
+      (item) => item.id === trxId || item.kode_transaksi === trxId
+    );
+    if (transaction) {
+      transaction.status_pembayaran = "REFUNDED";
+      transaction.refund_notes = notes;
+      transaction.refunded_at = new Date(Date.now());
+      transaction.refunded_by = operator;
+      transaction.updated_at = new Date(Date.now());
+      return {
+        rows: [
+          {
+            id: transaction.id,
+            kode_transaksi: transaction.kode_transaksi,
+            status_pembayaran: transaction.status_pembayaran,
+            refund_notes: transaction.refund_notes,
+            refunded_at: transaction.refunded_at,
+            refunded_by: transaction.refunded_by,
+          },
+        ],
+      };
+    }
+    return { rows: [] };
+  }
+
+  if (
     normalizedSql.includes("UPDATE kuota_tiket") &&
     normalizedSql.includes("GREATEST(0, kuota_terpesan - $1)") &&
     !normalizedSql.includes("kuota_terjual")
@@ -399,6 +434,34 @@ export async function executeMemoryQuery(
           pembeli_email: buyer?.email || "",
           pembeli_phone: buyer?.no_whatsapp || "",
           route_name: kuotaTable.find((item) => item.id === trx.kuota_id)?.nama_event || "Samarinda → Penajam",
+        },
+      ],
+    };
+  }
+
+  // 7b. Lock baris Transaksi untuk refund admin
+  if (
+    normalizedSql.includes("FROM transaksi") &&
+    normalizedSql.includes("refund_notes") &&
+    normalizedSql.includes("FOR UPDATE")
+  ) {
+    const target = String(params[0]);
+    const trx = transaksiTable.find(
+      (t) =>
+        t.id === target ||
+        t.kode_transaksi === target ||
+        t.gateway_order_id === target
+    );
+    if (!trx) return { rows: [] };
+    return {
+      rows: [
+        {
+          id: trx.id,
+          kode_transaksi: trx.kode_transaksi,
+          status_pembayaran: trx.status_pembayaran,
+          refund_notes: trx.refund_notes || null,
+          refunded_at: trx.refunded_at || null,
+          refunded_by: trx.refunded_by || null,
         },
       ],
     };
@@ -617,6 +680,9 @@ export async function executeMemoryQuery(
           "Waktu Check-In": "-",
           "Petugas Gate": "-",
           "Total Bayar (IDR)": tr.total_bayar,
+          "Catatan Refund": tr.refund_notes || "-",
+          "Waktu Refund": tr.refunded_at ? tr.refunded_at.toISOString() : null,
+          "Operator Refund": tr.refunded_by || "-",
         });
       } else {
         for (const t of tickets) {
@@ -635,6 +701,9 @@ export async function executeMemoryQuery(
             "Waktu Check-In": t.waktu_scan ? t.waktu_scan.toISOString() : "-",
             "Petugas Gate": t.scanned_by || "-",
             "Total Bayar (IDR)": tr.total_bayar,
+            "Catatan Refund": tr.refund_notes || "-",
+            "Waktu Refund": tr.refunded_at ? tr.refunded_at.toISOString() : null,
+            "Operator Refund": tr.refunded_by || "-",
           });
         }
       }

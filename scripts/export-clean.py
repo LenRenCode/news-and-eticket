@@ -23,6 +23,10 @@ def should_exclude(rel_path):
         if part in FORBIDDEN_DIR_NAMES:
             return True
 
+    # Skip root data/ scratch directory
+    if parts[0] == "data":
+        return True
+
     # 2. Skip existing zip archives
     if rel_path.endswith(".zip"):
         return True

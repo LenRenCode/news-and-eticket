@@ -6,9 +6,7 @@ import { isProductionMode } from "./app-mode";
 dotenv.config({ path: "../../.env" });
 dotenv.config();
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  "postgresql://postgres:postgres@localhost:5432/eticket?schema=public";
+const connectionString = process.env.DATABASE_URL;
 
 let pgAvailable: boolean | null = null;
 
@@ -22,6 +20,16 @@ const realPool = new Pool({
 // Deteksi ketersediaan PostgreSQL
 export async function checkPostgres(): Promise<boolean> {
   if (pgAvailable !== null) return pgAvailable;
+  if (!connectionString) {
+    pgAvailable = false;
+    if (isProductionMode()) {
+      throw new Error("DATABASE_URL wajib diisi untuk mode production.");
+    }
+    console.warn(
+      "[Database Warning] DATABASE_URL tidak diatur; menggunakan database in-memory mode demo."
+    );
+    return false;
+  }
   try {
     const client = await realPool.connect();
     client.release();

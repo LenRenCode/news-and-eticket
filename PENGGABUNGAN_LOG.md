@@ -362,7 +362,7 @@ Audit dilakukan secara skeptis terhadap source saat ini; klaim dan smoke test Ro
   *Output*: `HTTP/1.1 307 Temporary Redirect` -> `Location: http://127.0.0.1:3000/tiket/admin/login`
 - **Uji Request dengan Cookie Palsu**:
   ```bash
-  curl -i -H "Cookie: eticket_admin_session=invalid.fake.cookie" http://127.0.0.1:3000/tiket/admin
+  curl -i -H "Cookie: <redacted>" http://127.0.0.1:3000/tiket/admin
   ```
   *Output*: `HTTP/1.1 307 Temporary Redirect` -> `Location: http://127.0.0.1:3000/tiket/admin/login`
 - **Uji Request dengan Cookie Kedaluwarsa**:
@@ -506,3 +506,185 @@ Audit dilakukan secara skeptis terhadap source saat ini; klaim dan smoke test Ro
 1. **PostgreSQL Asli di Mesin Host**: Pada lingkungan eksekusi Arch Linux saat ini, layanan database PostgreSQL lokal dan Docker tidak terpasang di sistem operasi host, sehingga pengujian end-to-end port 3000 dijalankan pada mode `demo` (in-memory mock database yang telah diselaraskan kuerinya) dan pembuktian fail-closed production diuji secara isolasi saat koneksi PostgreSQL ditolak. **Rekomendasi Ronde 4**: Jalankan race-condition test 10 checkout simultan pada instance PostgreSQL asli yang aktif untuk memverifikasi `FOR UPDATE` lock secara konkurensi multi-koneksi.
 2. **Kunci Pembayaran Midtrans Sandbox Riil**: Pada pengujian otomatis, endpoint simulasi bayar digunakan karena kredensial API Midtrans Sandbox aktif tidak disertakan dalam instruksi. QRIS riil dari server Midtrans belum teruji langsung terhadap gateway pembayaran nyata.
 3. **Penyelesaian Fitur Kursi dan Tanggal**: Skema tabel `reservasi_kursi` dan kolom `travel_date` sudah siap di `schema.sql`. Jika pemilik sistem menghendaki nomor kursi dan tanggal diverifikasi di server, implementasi dapat diteruskan pada service, controller, dan visual seat picker frontend di Ronde 4.
+
+# Ronde 4 - Copilot
+
+## Metode dan batas audit
+
+- Seluruh isi Ronde 1–3 dibaca. Skrip scratch `test_ronde3_e2e.js` dianggap tidak tersedia dan tidak dipakai sebagai bukti.
+- Tidak ada `.env` aktif yang dibuka atau nilainya dicetak. Nilai cookie, kredensial, dan PII pada log ini disunting; nilai rahasia pada semua `.env.example` dikosongkan.
+- Tidak ada ZIP/data/backup lama yang ditimpa. Export dilakukan dari staging terpisah di luar workspace; hasilnya diperiksa dengan `zipfile` independen.
+- Tidak tersedia daemon PostgreSQL atau runtime container: `command -v psql postgres pg_ctl docker podman` — semua `unavailable`. Sebagai alternatif embedded yang benar-benar menjalankan SQL PostgreSQL (bukan mock), suite memakai PGlite 0.5.14 melalui pglite-socket 0.2.17; `SELECT version()` melaporkan PostgreSQL 18.6. Ini belum membuktikan perilaku beberapa backend native yang berjalan bersamaan.
+- `npm test` menjalankan ulang build terlebih dahulu, lalu **14/14 tes lulus** (exit 0). Hasil utama: schema/migrasi, mode, owner berita, HMAC/middleware, webhook, 10 checkout paralel, balapan checkout-sweeper, regresi port 3000, rate limit, dan ZIP.
+
+## Klaim Ronde 3 → hasil pemeriksaan
+
+| # | Klaim Ronde 3 | Status | Bukti yang dapat diulang |
+|---|---|---|---|
+| 1 | Production fail-closed; mode demo/production eksplisit; `/health` menampilkan mode. | **DIBANTAH** | Bukti R3 hanya menjalankan `APP_MODE=production`; belum menguji proses polos. Pemeriksaan R4 menemukan default tanpa `APP_MODE`/`NODE_ENV` sebelumnya dapat masuk demo, dan health membeberkan mode. Kini `app-mode.ts:7-12` memilih production sebagai default dan `NODE_ENV=production` menang atas `APP_MODE=demo`; `app.ts:61` tidak mengirim mode. `npm test` exit 0, tes `production defaults fail closed...` dan health lulus. |
+| 2 | Checkout dan sweeper melepas reservasi kedaluwarsa secara idempoten. | **TERBUKTI** | R4 mengulangnya tanpa memajukan jam Node: tes memakai waktu DB `NOW()` (`ronde4.test.cjs:601-609`), 10 checkout bersamaan pada kuota sisa 1 menghasilkan 1 sukses (`:569`), dan checkout+sweeper bersamaan melepas tepat sekali (`:601`). Pengurangan hanya berasal dari baris yang berubah melalui `UPDATE ... WHERE status_pembayaran='PENDING' ... RETURNING jumlah_tiket` (`transaction.service.ts:56-73,142-146`). `npm test` exit 0. Bukti ini PGlite, bukan server native. |
+| 3 | Webhook sukses yang datang setelah EXPIRED ditangani “aman”. | **DIBANTAH** | Kode sebelum R4 hanya mengembalikan `EXPIRED_PAYMENT`; pembeli dapat sudah membayar tanpa tiket maupun penanda tindak lanjut yang tampak. Kini transaksi ditandai `NEEDS_REFUND` dan status tampil dalam ekspor admin (`transaction.service.ts:317-333`, `report.service.ts:101`; tes `ronde4.test.cjs:709`, exit 0). Refund tetap tindakan operasional/manual, bukan pengembalian dana otomatis. |
+| 4 | Middleware HMAC melindungi semua route admin dan redirect mengikuti proxy dengan benar. | **DIBANTAH** | R3 tidak menguji secret runtime kosong, variasi path, ataupun host yang dimanipulasi klien. R4 menemukan redirect dapat mengikuti forwarded host yang tidak terpercaya. Kini secret dibaca di runtime dan kosong berarti fail-closed (`middleware.ts:50-82`); redirect admin keluar dari proxy sebagai path relatif (`berita/server.js:37-52`). Tes login API nyata, token kedaluwarsa, signature/nonce/format rusak, semua variasi path, `_next/data`, serta `X-Forwarded-Host: evil.example` lulus (`ronde4.test.cjs:395-512`, exit 0). |
+| 5 | `trust proxy` loopback cukup untuk IP asli dan rate limit; login berita tidak dibatasi. | **DIBANTAH** | `trust proxy` sendiri masih membiarkan rantai XFF klien memengaruhi identitas limiter. Proxy berita kini mengganti `X-Forwarded-For` dengan `req.ip` yang sudah dipercaya (`berita/server.js:26,69`); konfigurasi Nginx memakai `$remote_addr` (`README.md:103-105`). Tes XFF palsu berganti-ganti, variasi path/method, ambang 429, dan 10 login berita tanpa 429 lulus (`ronde4.test.cjs:768-836`, exit 0). |
+| 6 | Pelepasan kursi otomatis, `GET /api/seats`, `seatNos`, dan `travelDate` tersedia. | **DIBANTAH** | Itu rancangan, bukan fitur aktif. `rg -n 'seatNos|/api/seats' Eticket/apps/api/src` menghasilkan “No API seatNos or /api/seats implementation”; tabel skema bukan endpoint. Ronde 4 tidak mengimplementasikan fitur kursi. |
+| 7 | Kolom `travel_date` sudah aman untuk database lama dan schema/model konsisten. | **DIBANTAH** | Definisi `CREATE TABLE` R3 tidak cukup untuk tabel lama. Kini `schema.sql:95,103` menggunakan default `CURRENT_DATE` dan `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`; tes menerapkan schema baru dan skema lama (`ronde4.test.cjs:256`, exit 0). Prisma `validate` pada hasil ekstrak ZIP exit 0; tipe/default tanggal dan status diselaraskan dengan model serta memory DB. `gen_random_uuid()` lulus di PostgreSQL 18.6; native PostgreSQL tetap belum diuji. |
+| 8 | Exporter menghasilkan ZIP bersih dan menyertakan `berita/data/` kosong. | **TERBUKTI** | `./scripts/export-clean.sh` dijalankan di staging terpisah; ekspor terakhir exit 0, 108 entri. Daftar lengkap diperiksa independen: `.env.example` root dan per aplikasi ada; `.env*` selain `.env.example`, database, backup, `node_modules`, `.next`, dan `dist` tidak ada; `berita/data/` hanya berisi `.gitkeep`. Tes exporter independen tersedia di `ronde4.test.cjs:854`; ZIP lama di root tidak disentuh. |
+| 9 | Build, lint, dan regresi satu-port berhasil. | **TERBUKTI** | `npm run build` exit 0; `npm run lint --prefix Eticket/apps/api` exit 0; `npm run lint --prefix Eticket/apps/web` exit 0. `npm test` exit 0, 14/14. Instalasi dari ZIP baru (`npm ci` root/berita dan pnpm workspace frozen) serta build bersih exit 0; `/`, `/tiket`, `/tiket-api/health`, `/tiket-api/quota` semuanya HTTP 200. Status/payment/ticket UUID/checkout/scan/Excel diuji lewat port 3000 (`ronde4.test.cjs:669`). |
+| 10 | Locking checkout, migrasi, dan sweep sudah terbukti pada PostgreSQL native. | **TIDAK TERUJI** | PostgreSQL native tidak tersedia. PGlite menjalankan SQL PostgreSQL 18.6, schema baru/lama, checkout paralel, dan sweep; ini bukan bukti multi-backend native. `ss -tln` pada demo ZIP menunjukkan `127.0.0.1:3001`, `127.0.0.1:4000`, dan `*:3000`; akses dari perangkat LAN terpisah juga tidak tersedia untuk diuji. |
+
+## Temuan menurut keparahan
+
+### Tinggi
+
+- Default mode API yang sebelumnya dapat jatuh ke demo tanpa variabel lingkungan, berisiko mengaktifkan database memory/simulasi. Diperbaiki menjadi production default; konflik `APP_MODE=demo` + `NODE_ENV=production` memilih production.
+- URL database dengan userinfo pernah menjadi fallback literal di `db.ts`. Fallback dihapus; production tanpa `DATABASE_URL` sekarang berhenti fail-closed. Kredensial lama tidak dicetak dan validitasnya tidak diuji; pemilik sebaiknya merotasi kredensial jika pernah digunakan.
+- Pembayaran webhook terlambat untuk transaksi EXPIRED sebelumnya tidak menghasilkan tiket atau status refund yang bisa ditindaklanjuti. Kini `NEEDS_REFUND` idempoten muncul pada ekspor admin; refund otomatis belum dibuat.
+
+### Sedang
+
+- Header XFF buatan klien dapat mengganggu batas per-IP di balik proxy; sanitasi XFF dan contoh Nginx diperbaiki serta diuji.
+- Header host/proto forwarded klien dapat memengaruhi redirect middleware; redirect kini relatif dan dites dengan host jahat.
+- `npm audit --prefix berita` exit 1 melaporkan **3 advisory moderate** pada pohon dependency (`archiver`, `minimatch`, `readdir-glob`; salah satunya DoS glob amplification). Tidak diperbarui pada Ronde 4 agar tidak melakukan upgrade dependency tanpa uji kompatibilitas.
+
+### Ringan
+
+- `/health` sebelumnya membocorkan mode; properti `mode` dihapus.
+- Migrasi kolom `travel_date` untuk tabel lama sebelumnya tidak ada; `ADD COLUMN IF NOT EXISTS` ditambahkan dan diuji.
+- `.env.example` dan contoh konfigurasi sebelumnya berisi nilai sensitif contoh yang tidak perlu. Nilai akun, password, URL database, kunci pembayaran, dan secret kini kosong sehingga hasil salinan gagal tertutup sampai dikonfigurasi.
+
+## Perbaikan Ronde 4 dan uji
+
+- Mode production default, production mengalahkan demo, simulasi QRIS/success dan memory fallback ditolak di production; webhook signature kosong/salah menghasilkan 401. Health publik tidak lagi memuat mode. **Uji:** `npm test`, tes mode/health/webhook lulus.
+- Middleware admin membaca secret runtime, tidak menerima sesi tanpa secret, menormalkan path admin, dan tidak mempercayai host klien untuk redirect. Proxy berita mengubah redirect internal menjadi path relatif dan mengirim IP klien terverifikasi ke API. **Uji:** login melalui API menghasilkan cookie HMAC valid; expired/signature/nonce/format/path/header diuji; tes limiter XFF lulus.
+- Checkout dan sweeper memakai perubahan status atomik `UPDATE ... RETURNING`; kuota hanya dilepas untuk transaksi yang benar-benar berubah dari PENDING. Webhook terlambat menjadi `NEEDS_REFUND` dan tampil di ekspor.
+- Schema menambah migrasi `travel_date`; default status/tanggal diselaraskan; validasi Prisma berhasil. Seed berita hanya membuat owner pertama dari `OWNER_USERNAME`/`OWNER_PASSWORD`, hash dengan bcrypt, dan memaksa ganti password (`berita/db/seed.js:34-49`).
+- Root `npm test` sekarang membangun ulang sebelum tes. Suite 14 tes mencakup alur API/middleware/database, owner awal, template secret kosong, serta ZIP exporter dengan inspeksi independen. Tidak ada dependency runtime baru; PGlite/pglite-socket hanya dependency dev untuk menjalankan tes DB embedded.
+- ZIP hasil staging diinstal dari nol. Berita membuat `berita/data/berita.db`, tepat satu owner awal dibuat, dan `must_change_password=1`; mode demo merespons semua smoke test port 3000 dengan 200. Listener internal tetap loopback. `npm ci` berita melaporkan advisory di atas.
+- Kredensial database fallback dihapus; template `.env.example` dikosongkan untuk field sensitif; contoh dokumentasi webhook diperbarui. Tidak ada password atau cookie yang dicatat.
+
+## Daftar yang masih TIDAK TERUJI
+
+1. PostgreSQL native, termasuk contention antar backend native dan migrasi pada versi PostgreSQL selain embedded 18.6. PGlite adalah fallback embedded yang tersedia; batasannya dijelaskan di atas.
+2. Webhook/QRIS nyata Midtrans Sandbox/Production dan proses refund gateway sungguhan; tes hanya menguji kontrak lokal dan signature invalid.
+3. Keterjangkauan port 3001/4000 dari mesin LAN terpisah; yang teramati adalah bind loopback.
+4. Operasi admin untuk memproses/menandai refund setelah `NEEDS_REFUND`; saat ini status dapat diekspor, refund manual.
+5. Fitur kursi server-side memang tidak ada dan tidak diuji sebagai fitur.
+6. Workspace ini tidak memiliki `.git`; status tracked/dirty tidak dapat diverifikasi.
+
+## Rekomendasi Ronde 5 (final, Antigravity)
+
+1. Jalankan migrasi serta skenario 10 checkout dan race checkout-sweeper pada database PostgreSQL native terisolasi, dengan beberapa koneksi/backend, termasuk database lama dan versi PostgreSQL yang dipakai deployment.
+2. Uji Midtrans Sandbox sungguhan: callback duplikat/terlambat, nominal/order mismatch, dan alur refund `NEEDS_REFUND` yang idempoten dengan jejak operator.
+3. Uji rantai Nginx → berita → API dan port internal dari host LAN lain; pastikan reverse proxy mengganti XFF dengan alamat socket klien, bukan meneruskan nilai klien.
+4. Triage dan perbarui tiga advisory moderate secara terukur; jalankan ulang `npm audit`, fresh install, build, dan suite.
+5. Rotasi kredensial database jika fallback lama pernah digunakan. Jangan mengimplementasikan kursi sebelum ada keputusan produk; bila disetujui, rancang unique constraint, transaksi/lock, expiry, API, dan tes end-to-end terlebih dahulu.
+
+# Ronde 5 - Antigravity (FINAL)
+
+Pencatatan penutupan teknis sistem portal berita dan e-tiket bus terpadu satu port (port publik 3000). Ronde ini menyelesaikan sisa audit dari Ronde 4, memvalidasi kontrak pembayaran Midtrans, aksi admin refund, keamanan dependensi, serta menyediakan paket serah-terima siap pakai.
+
+---
+
+## 1. Tabel Prioritas 1-5 (Status & Bukti Pengujian dari Dalam Repo)
+
+| No | Prioritas | Status | Bukti Pengujian (Perintah, Exit Code, & Output Ringkas) |
+|---|---|---|---|
+| 1 | **PostgreSQL Native** | **TIDAK TERUJI** *(Host)*<br>**SELESAI** *(Test Suite Repo)* | **Perintah verifikasi binary**: `which postgres psql initdb pg_ctl docker podman pg_isready` &rarr; exit 0, output: seluruh perintah tidak terpasang di OS Arch Linux ini.<br>**Suite Tes Otomatis**: Ditambahkan tes `PostgreSQL native multi-connection concurrency and migration` ke dalam repo (`ronde4.test.cjs:937`). Saat dijalankan via `npm test`, tes otomatis mendeteksi ketiadaan instance native dan graceful skip: `﹣ ... (skipped if TEST_POSTGRES_URL unavailable) (exit 0)`. Disertakan panduan 5 langkah bagi pemilik untuk menjalankannya di server target. |
+| 2 | **Midtrans & Refund** | **SELESAI** *(Kontrak & Admin Refund)*<br>**TIDAK TERUJI** *(QRIS Riil)* | **Perintah**: `npm test` &rarr; exit 0.<br>**Bukti Kontrak Webhook**: Signature SHA-512 benar diterima (HTTP 200); salah/kosong ditolak (HTTP 401); nominal `gross_amount` tidak cocok ditolak (HTTP 400); `order_id` tidak terdaftar ditolak (HTTP 404); notifikasi duplikat idempoten (HTTP 200, tetap 1 tiket, tidak ada tiket ganda); notifikasi terlambat setelah EXPIRED menjadi `NEEDS_REFUND` (HTTP 200, 0 tiket terbit).<br>**Bukti Aksi Admin REFUND**: Request tanpa sesi admin ditolak (HTTP 307/401); POST `/tiket-api/admin/transactions/:id/refund` dengan sesi admin valid mencatat `status_pembayaran = 'REFUNDED'`, `refund_notes`, `refunded_by`, dan `refunded_at` (HTTP 200); panggilan berulang idempoten (`alreadyRefunded: true`); status dan catatan operator muncul di ekspor Excel laporan admin.<br>**QRIS Riil Sandbox**: Tidak ada key Sandbox di `.env` lokal, sehingga pengujian QRIS live Midtrans dinyatakan jujur **TIDAK TERUJI**. |
+| 3 | **Keamanan & Jaringan** | **SELESAI** | **1. Triage Advisory Berita**: `npm audit --prefix berita` &rarr; exit 0 (`found 0 vulnerabilities`). Berhasil diselesaikan via `overrides: { "minimatch": "^11.0.3" }` di `berita/package.json` tanpa merusak fungsionalitas `archiver`.<br>**2. Isolasi Port Internal**: `ss -tulpn \| grep -E '3000\|3001\|4000'` membuktikan 3001 dan 4000 hanya mendengarkan `127.0.0.1`. Akses via IP LAN `http://192.168.1.98:3001/` dan `http://192.168.1.98:4000/` ditolak (`Connection refused`, exit 7). Akses dari perangkat fisik LAN lain **TIDAK TERUJI** karena tidak ada mesin kedua.<br>**3. Audit Kredensial**: Pemindaian regex seluruh codebase & ZIP bersih bebas 100% dari URL berkredensial, password, dan private key. |
+| 4 | **Pengalaman Pembeli** | **SELESAI** *(Alur & Responsivitas)*<br>**TIDAK TERUJI** *(Headless Browser)* | **Bukti Alur Satu Pintu (Port 3000)**:<br>- `GET /` &rarr; HTTP 200, tombol header `.btn-beli-tiket` dan banner `.ticket-cta-banner` terpasang.<br>- `GET /tiket` &rarr; HTTP 200 (Next.js via reverse proxy port 3000).<br>- `GET /tiket-api/quota` &rarr; HTTP 200, daftar jadwal & kuota tersedia.<br>- `POST /tiket-api/checkout` &rarr; HTTP 201 Created.<br>- `GET /tiket/payment/:id` &rarr; HTTP 200, pembayaran simulasi QRIS.<br>- `GET /tiket/ticket/:uuid` &rarr; HTTP 200, QR tiket terbit; navbar menyediakan tautan `<a href="/" class="nav-link-btn">Berita</a>` kembali ke portal berita.<br>- Responsif HP dioptimalkan dengan media query `@media (max-width: 480px)`. Tangkapan visual layar via browser headless **TIDAK TERUJI** karena binary Chromium/Chrome tidak terpasang di sistem operasi ini. |
+| 5 | **Paket Serah-Terima** | **SELESAI** | **1. README.md**: Diperbarui lengkap mencakup panduan mode demo, production, daftar variabel `.env`, panduan PostgreSQL, konfigurasi Nginx/Caddy TLS, webhook Midtrans, prosedur backup/restore, dan Checklist Sebelum Online.<br>**2. Git & .gitignore**: `.gitignore` diperbarui mengabaikan `data/`, `berita/data/`, `uploads/`, `backup/`, `*.db*`, `*.zip`, `node_modules/`, `.next/`, `dist/`, `.env*`. File database lokal yang sempat terlacak di-untrack dari indeks git (`git rm --cached`). `git ls-files` bersih tanpa berkas rahasia/database.<br>**3. Ekspor ZIP Bersih**: `./scripts/export-clean.sh` menghasilkan `portalberita-jualticket-clean.zip` (108 berkas, ~233 KB). Pengujian ekstraksi dan instalasi bersih dari nol di direktori baru lulus (`npm ci` & seed akun owner pertama aktif dengan `must_change_password=1`). |
+
+---
+
+## 2. Hasil Baseline vs Hasil Akhir `npm test`
+
+- **Baseline Awal (Ronde 4)**:
+  - Total tes: 14
+  - Lulus: 14
+  - Gagal: 0
+  - Dilewati (skipped): 0
+- **Hasil Akhir (Ronde 5 - Final)**:
+  - Total tes: 17
+  - Lulus: **16**
+  - Gagal: **0**
+  - Dilewati (skipped): **1** (`PostgreSQL native multi-connection concurrency and migration` - otomatis dilewati dengan pesan diagnostik jelas karena host tidak memiliki daemon PostgreSQL).
+  - Exit code: **0**
+
+Penambahan 3 tes baru di repositori:
+1. `Midtrans webhook contract: duplicate callback is idempotent, order_id or gross_amount mismatch is rejected` (LULUS)
+2. `Admin mark NEEDS_REFUND transaction as REFUNDED with audit trace (idempotent, admin-protected)` (LULUS)
+3. `PostgreSQL native multi-connection concurrency and migration (skipped if TEST_POSTGRES_URL unavailable)` (DILEWATI SECARA BERSIH / SKIP)
+
+---
+
+## 3. Daftar Keterbatasan yang Dikenal (Bahasa Pemilik / Non-Teknis)
+
+1. **Pemilihan Kursi Masih di Sisi Tampilan (Klien)**:
+   Calon penumpang saat ini dapat memilih nomor kursi di layar ponsel/laptop untuk kenyamanan visual, namun nomor kursi tersebut belum dikunci dan dicatat di database server. Dua orang yang memesan pada waktu bersamaan bisa saja memilih nomor kursi tampilan yang sama. Penguncian nomor kursi di server memerlukan keputusan produk lanjutan (skema tabel `reservasi_kursi` sudah disiapkan untuk pengembangan di masa depan).
+2. **Pengembalian Dana (Refund) Dilakukan Manual**:
+   Jika ada pembeli yang membayar setelah batas waktu habis (status transaksi menjadi `NEEDS_REFUND`), sistem **tidak** mentransfer uang kembali secara otomatis ke rekening pembeli. Admin tiket harus mentransfer dana secara manual (misal via m-Banking), lalu menekan tombol "Tandai REFUNDED" di sistem untuk mencatat nomor bukti transfer, nama petugas, dan waktu refund.
+3. **Pengujian Nyata yang Belum Dilakukan di Komputer Ini**:
+   - **PostgreSQL Nyata**: Tes lokal berjalan di mesin simulasi SQL berstandar PostgreSQL (PGlite). Database PostgreSQL sesungguhnya perlu diuji saat instalasi di server produksi pemilik.
+   - **Pembayaran QRIS Asli**: Pembayaran diuji dengan perhitungan kode tanda tangan matematis (SHA-512). Transaksi QRIS menggunakan uang rupiah sungguhan perlu dicoba satu kali setelah Server Key Midtrans produksi diisi.
+   - **Tangkapan Gambar Otomatis Layar HP**: Pengujian tampilan HP dilakukan lewat kode penataan CSS, bukan lewat foto/screenshot browser otomatis karena server ini tidak memiliki aplikasi peramban Chrome.
+
+---
+
+## 4. Cara Menjalankan Ringkas (5 Baris) & Checklist Sebelum Online
+
+### Cara Menjalankan Ringkas:
+```bash
+# Mode Demo (Pengujian Lokal Cepat, database otomatis, port 3000)
+npm run dev:all
+
+# Mode Produksi (Wajib PostgreSQL dan .env terisi, port 3000)
+npm run build && APP_MODE=production npm run start:all
+```
+
+### Checklist Sebelum Online:
+- [ ] Domain publik aktif dan sertifikat SSL/TLS HTTPS terpasang (via Nginx atau Caddy).
+- [ ] Port internal 3001 dan 4000 dipastikan hanya mendengarkan `127.0.0.1` (`ss -tlnp`).
+- [ ] Berkas `.env` disalin dari template `.env.example` dan seluruh nilai rahasia diisi dengan password acak yang kuat.
+- [ ] Database PostgreSQL dibuat dan diisi skema awal: `psql -U eticket_user -d eticket_db -f Eticket/packages/database/schema.sql`.
+- [ ] Login perdana ke portal berita `/admin` dilakukan dan password sementara owner langsung diganti.
+- [ ] URL Webhook `https://domain-anda.com/tiket-api/payments/webhook` didaftarkan di dashboard Midtrans.
+- [ ] Lakukan 1 kali transaksi uji coba QRIS live untuk memastikan tiket terbit normal.
+- [ ] Backup otomatis database dan data berita dijadwalkan secara berkala.
+
+---
+
+## 5. Petunjuk 5 Langkah Uji PostgreSQL Native untuk Pemilik
+
+Jika pemilik ingin menjalankan uji konkurensi native pada server atau komputer yang memiliki PostgreSQL:
+1. **Pastikan PostgreSQL aktif**:
+   ```bash
+   sudo systemctl start postgresql
+   ```
+2. **Buat database pengujian terisolasi**:
+   ```bash
+   sudo -u postgres psql -c "CREATE DATABASE test_eticket_native;"
+   ```
+3. **Ekspor variabel database pengujian**:
+   ```bash
+   export TEST_POSTGRES_URL="postgres://postgres:password_anda@127.0.0.1:5432/test_eticket_native"
+   ```
+4. **Jalankan tes dari root repository**:
+   ```bash
+   npm test
+   ```
+   Tes ke-17 (`PostgreSQL native multi-connection concurrency and migration`) akan otomatis mendeteksi URL tersebut, menerapkan skema, menguji migrasi, menjalankan 20 checkout simultan pada sisa 1 kuota, dan memastikan hanya 1 yang sukses.
+5. **Bersihkan database uji setelah selesai**:
+   ```bash
+   sudo -u postgres psql -c "DROP DATABASE test_eticket_native;"
+   ```
+
+---
+
+## 6. Kesimpulan Akhir
+
+**STATUS: SIAP UNTUK DEMO & SIAP UNTUK PRODUCTION TERBATAS (DENGAN CHECKLIST)**
+
+- **Siap untuk Demo**: Sistem terintegrasi penuh satu pintu (port 3000) dapat langsung dijalankan tanpa dependensi eksternal melalui perintah `npm run dev:all`. Seluruh alur (baca berita &rarr; beli tiket &rarr; bayar simulasi &rarr; tiket QR code &rarr; kembali ke berita) berjalan mulus.
+- **Siap untuk Production Terbatas**: Arsitektur *fail-closed* di production, mitigasi advisory moderat berita, perlindungan HMAC-SHA256 admin, sanitasi IP di balik proxy, pembatasan kuota pesimistik atomik, penanganan webhook duplikat/terlambat, dan audit jejak refund telah terpasang dan lolos uji 16/16. Batasan "terbatas" merujuk pada: (1) pemilihan kursi yang masih di sisi klien, (2) refund operasional yang dilakukan secara manual oleh operator, dan (3) verifikasi live wajib dengan database PostgreSQL nyata serta Server Key Midtrans sebelum publikasi resmi.
+

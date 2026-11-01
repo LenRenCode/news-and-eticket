@@ -46,11 +46,10 @@ async function verifySessionToken(token: string, secret: string): Promise<boolea
   );
 }
 
-function getLoginRedirect(): NextResponse {
-  return new NextResponse(null, {
-    status: 307,
-    headers: { Location: "/tiket/admin/login" },
-  });
+function getLoginRedirect(request: NextRequest): NextResponse {
+  return NextResponse.redirect(
+    new URL("/tiket/admin/login", request.nextUrl.origin)
+  );
 }
 
 function getProtectedAdminPath(pathname: string): string | null {
@@ -83,16 +82,16 @@ export async function middleware(request: NextRequest) {
     const secret = process.env.ADMIN_SESSION_SECRET;
 
     if (!sessionCookie || !secret || secret.length < 32) {
-      return getLoginRedirect();
+      return getLoginRedirect(request);
     }
 
     try {
       const valid = await verifySessionToken(sessionCookie, secret);
       if (!valid) {
-        return getLoginRedirect();
+        return getLoginRedirect(request);
       }
     } catch {
-      return getLoginRedirect();
+      return getLoginRedirect(request);
     }
   }
 

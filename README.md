@@ -1,98 +1,159 @@
-# Portal Berita & Tiket Bus Antar Kota
+# Portal Berita & Sistem Pemesanan E-Tiket Bus Antar Kota
 
-Aplikasi web terintegrasi satu pintu (single-origin reverse proxy) yang menggabungkan portal berita (`berita/` Express + EJS + SQLite) dan sistem pemesanan tiket bus (`Eticket/` Next.js + Express API + PostgreSQL) di bawah **satu port publik (3000)**.
+Aplikasi web terintegrasi satu pintu (*single-origin reverse proxy*) yang menggabungkan portal berita (`berita/` Express + EJS + SQLite) dan sistem pemesanan e-tiket bus (`Eticket/` Next.js + Express API + PostgreSQL) di bawah **satu port publik (port 3000)**.
 
-- **Port Publik (3000)**: Satu-satunya port yang diakses oleh pengguna/browser.
-- **Next.js Web (3001)** & **API Tiket (4000)**: Berjalan internal dan hanya mendengarkan pada loopback `127.0.0.1`.
+- **Port Publik (3000)**: Satu-satunya port yang diakses oleh pengguna, admin, dan reverse proxy TLS luar.
+- **Next.js Web (3001)** & **API Tiket (4000)**: Berjalan internal dan hanya terikat pada loopback `127.0.0.1`.
 - **Rute URL**:
   - `/` & semua artikel berita dilayani langsung oleh portal Berita.
-  - `/tiket/*` diteruskan (reverse proxy) ke Next.js dengan proteksi server-side middleware untuk `/tiket/admin/*`.
+  - `/tiket/*` diteruskan (*reverse proxy*) ke Next.js Web dengan proteksi server-side middleware untuk `/tiket/admin/*`.
   - `/tiket-api/*` diteruskan ke API tiket dengan path rewrite otomatis ke `/api/*`.
 
 ---
 
-## ⚙️ Mode Aplikasi: `APP_MODE` (Demo vs Production)
+## 🚀 1. Cara Menjalankan
 
-Aplikasi memiliki switch mode eksplisit melalui variabel lingkungan `APP_MODE`:
+### A. Mode Demo (Cepat / Pengujian Lokal Tanpa PostgreSQL)
+Mode demo mengaktifkan in-memory database mock dan simulasi pembayaran QRIS untuk demonstrasi antarmuka:
+```bash
+# 1. Pasang dependensi
+npm install
+npm install --prefix berita
+pnpm install --dir Eticket
 
-Jika kedua variabel mode tidak diatur, aplikasi menggunakan **production**.
-`NODE_ENV=production` selalu mengalahkan `APP_MODE=demo`; mode demo hanya aktif
-jika diminta eksplisit dan proses tidak berjalan sebagai production.
-
-| Fitur / Karakteristik | `APP_MODE=demo` | `APP_MODE=production` |
-| :--- | :--- | :--- |
-| **Database Tiket** | Boleh In-Memory Mock jika PostgreSQL offline | **WAJIB** PostgreSQL aktif; error fail-closed jika offline |
-| **Payment Gateway** | Boleh QRIS simulasi jika key kosong/placeholder | **WAJIB** Server Key Midtrans asli; menolak placeholder |
-| **Cookie Sesi** | Tidak menggunakan atribut `Secure` (jalan di HTTP) | Menggunakan `Secure` saat diakses via HTTPS |
-| **Simulasi Bayar** | Endpoint `/api/payments/simulate-success` aktif | Endpoint simulasi pembayaran otomatis **404 Nonaktif** |
-| **Pelepasan Reservasi** | Aktif transaksional + sweeper berkala | Aktif transaksional + sweeper berkala |
+# 2. Jalankan seluruh layanan sekaligus (port 3000)
+npm run dev:all
+# Atau bila ingin menjalankan production build dalam mode demo:
+APP_MODE=demo npm run start:all
+```
+Buka browser di: [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## 📋 Prasyarat & Konfigurasi
-
-- **Node.js**: Versi 22+
-- **npm** (atau pnpm)
-- **PostgreSQL**: Wajib saat `APP_MODE=production`, opsional saat `APP_MODE=demo`.
-
-### 1. Salin Berkas Konfigurasi Lingkungan
-
-Salin template konfigurasi dari root atau subproyek:
-
+### B. Mode Production (Staging & Live Server)
+Mode produksi mewajibkan koneksi PostgreSQL nyata dan kredensial Midtrans asli (*fail-closed* jika database atau kunci belum disetel):
 ```bash
+# 1. Pastikan PostgreSQL sudah aktif dan schema.sql sudah diterapkan (lihat bagian 4)
+# 2. Salin dan lengkapi file .env (lihat bagian 3)
 cp .env.example .env
 cp berita/.env.example berita/.env
 cp Eticket/.env.example Eticket/apps/api/.env
-```
 
-Sesuaikan nilai rahasia di dalam file `.env`:
-- `APP_MODE`: Atur ke `demo` untuk uji coba lokal, atau `production` untuk staging/produksi.
-- `berita/.env`: atur `SESSION_SECRET` (minimal 32 karakter) dan `OWNER_PASSWORD`.
-- `Eticket/apps/api/.env`: atur `DATABASE_URL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, dan `ADMIN_SESSION_SECRET` (minimal 32 karakter).
+# 3. Bangun bundle Next.js & kompilasi TypeScript
+npm run build
 
----
-
-## 🚀 Menjalankan Aplikasi (Satu Perintah)
-
-Semua layanan dapat dijalankan langsung dari direktori root:
-
-### 1. Mode Pengembangan / Demo (`dev:all`)
-Menjalankan Berita (Express), Next.js dev server (port 3001 di 127.0.0.1), dan API tiket (tsx di 127.0.0.1:4000) dalam mode demo:
-
-```bash
-npm run dev:all
-```
-
-### 2. Mode Produksi (`start:all`)
-Membangun bundle Next.js (`next build`) & build API TypeScript, lalu menjalankan server produksi. Script ini otomatis menghormati variabel `APP_MODE`:
-
-```bash
-# Menjalankan dalam mode produksi standar (fail-closed jika PostgreSQL/Midtrans belum siap):
-npm run start:all
-
-# Atau menjalankan production build dalam mode demo di mesin lokal:
-APP_MODE=demo npm run start:all
+# 4. Jalankan seluruh layanan
+APP_MODE=production npm run start:all
 ```
 
 ---
 
-## 🔒 Konfigurasi Reverse Proxy TLS (Nginx / Caddy) di Depan Port 3000
+## 🔑 2. Daftar Variabel Lingkungan Wajib (`.env`)
 
-Pada lingkungan produksi publik, pasang reverse proxy TLS (HTTPS) di depan port 3000. Server Node telah dikonfigurasi dengan `trust proxy = loopback` sehingga `req.ip` membaca IP pengunjung asli dari header `X-Forwarded-For`.
+Seluruh variabel wajib diisi sebelum beralih ke mode produksi. Jangan menyematkan nilai rahasia di repositori atau file publik:
 
-### Contoh Konfigurasi Caddy (`Caddyfile`):
+### Root `.env` (atau diekspor ke environment sistem):
+```env
+APP_MODE=production
+NODE_ENV=production
+PORT=3000
+DATABASE_URL=
+SESSION_SECRET=
+OWNER_USERNAME=
+OWNER_PASSWORD=
+ADMIN_USERNAME=
+ADMIN_PASSWORD=
+ADMIN_SESSION_SECRET=
+PAYMENT_API_KEY=
+PAYMENT_WEBHOOK_SECRET=
+WEB_ORIGIN=
+```
+
+### `berita/.env`:
+```env
+PORT=3000
+DATA_DIR=data
+SESSION_SECRET=
+OWNER_USERNAME=
+OWNER_PASSWORD=
+ADMIN_PATH=admin
+ETICKET_WEB_URL=http://127.0.0.1:3001
+ETICKET_API_URL=http://127.0.0.1:4000
+```
+
+### `Eticket/apps/api/.env`:
+```env
+APP_MODE=production
+NODE_ENV=production
+API_PORT=4000
+DATABASE_URL=
+ADMIN_USERNAME=
+ADMIN_PASSWORD=
+ADMIN_SESSION_SECRET=
+PAYMENT_API_KEY=
+PAYMENT_WEBHOOK_SECRET=
+WEB_ORIGIN=http://127.0.0.1:3000
+```
+
+---
+
+## 🗄️ 3. Cara Menyiapkan PostgreSQL
+
+1. **Buat Pengguna dan Database PostgreSQL**:
+   ```bash
+   sudo -u postgres psql
+   ```
+   Di dalam prompt `psql`:
+   ```sql
+   CREATE USER eticket_user WITH PASSWORD 'ganti_dengan_password_kuat';
+   CREATE DATABASE eticket_db OWNER eticket_user;
+   GRANT ALL PRIVILEGES ON DATABASE eticket_db TO eticket_user;
+   \c eticket_db
+   GRANT ALL ON SCHEMA public TO eticket_user;
+   \q
+   ```
+
+2. **Terapkan Skema Database**:
+   ```bash
+   psql -U eticket_user -d eticket_db -h 127.0.0.1 -f Eticket/packages/database/schema.sql
+   ```
+
+3. **Format DATABASE_URL**:
+   ```text
+   DATABASE_URL="postgres://eticket_user:ganti_dengan_password_kuat@127.0.0.1:5432/eticket_db"
+   ```
+
+---
+
+## 🔒 4. Konfigurasi Reverse Proxy TLS (Nginx & Caddy)
+
+Pasang reverse proxy dengan sertifikat SSL/TLS di depan port 3000:
+
+### Opsi A: Caddy (`Caddyfile`)
 ```caddy
-yourdomain.com {
+portal.example.com {
     reverse_proxy 127.0.0.1:3000 {
         header_up X-Forwarded-Proto https
     }
 }
 ```
 
-### Contoh Konfigurasi Nginx:
+### Opsi B: Nginx (`/etc/nginx/sites-available/portal`)
 ```nginx
 server {
-    server_name yourdomain.com;
+    listen 80;
+    server_name portal.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name portal.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/portal.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/portal.example.com/privkey.pem;
+
+    client_max_body_size 25M;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
@@ -107,41 +168,63 @@ server {
 }
 ```
 
-### URL Webhook Publik Midtrans:
-Daftarkan URL webhook berikut pada Midtrans Dashboard (Settings -> Configuration):
+---
+
+## 💳 5. URL Webhook Midtrans
+
+Daftarkan URL callback ini pada **Dashboard Midtrans** (*Settings* &rarr; *Configuration* &rarr; *Payment Notification URL*):
 ```text
-https://yourdomain.com/tiket-api/payments/webhook
+https://portal.example.com/tiket-api/payments/webhook
 ```
 
 ---
 
-## 📦 Pembersihan & Ekspor Distribusi (`export-clean`)
+## 💾 6. Prosedur Backup & Restore
 
-Untuk membuat paket arsip distribusi yang bersih tanpa dependensi cache (`node_modules`), build output (`.next`, `dist`), kredensial aktif (`.env*`), database lama (`sessions.db`, `berita/data/*.db`), dan file uploads:
+### A. Backup Data
+1. **Portal Berita (SQLite & Unggahan Media)**:
+   - Unduh langsung melalui Panel Admin Redaksi: `/admin/backup` &rarr; tombol "Unduh Backup `.zip`".
+   - Atau salin manual dari terminal:
+     ```bash
+     tar -czvf backup_berita_$(date +%F).tar.gz berita/data/berita.db berita/data/uploads/
+     ```
+2. **Sistem Tiket (PostgreSQL)**:
+   ```bash
+   pg_dump -U eticket_user -h 127.0.0.1 -F c -b -v -f backup_tiket_$(date +%F).dump eticket_db
+   ```
 
+### B. Restore Data
+1. **Portal Berita**:
+   - Melalui Panel Admin: unggah file arsip `.zip` pada halaman `/admin/backup`.
+   - Atau pulihkan manual:
+     ```bash
+     tar -xzvf backup_berita_YYYY-MM-DD.tar.gz
+     ```
+2. **Sistem Tiket (PostgreSQL)**:
+   ```bash
+   pg_restore -U eticket_user -h 127.0.0.1 -d eticket_db -c -v backup_tiket_YYYY-MM-DD.dump
+   ```
+
+---
+
+## ✅ 7. Checklist Sebelum Online
+
+Sebelum membuka layanan ke publik, periksa seluruh butir berikut:
+- [ ] **Domain & TLS**: Domain aktif dan sertifikat HTTPS terpasang valid (Let's Encrypt / ZeroSSL).
+- [ ] **Port Internal Tertutup**: Jalankan `ss -tlnp` dan pastikan port 3001 dan 4000 hanya mendengarkan `127.0.0.1`.
+- [ ] **Variabel Lingkungan**: Salin `.env` lengkap, set `APP_MODE=production`, dan pastikan tidak ada nilai default/contoh yang tertinggal.
+- [ ] **Rotasi Kredensial**: Buat password acak yang kuat untuk owner berita, admin tiket, database PostgreSQL, dan rahasia sesi HMAC (minimal 32 karakter).
+- [ ] **Password Awal Redaksi**: Masuk ke panel berita `/admin`, ganti password sementara owner saat login pertama.
+- [ ] **Integrasi Midtrans**: Server Key dan Webhook Secret Sandbox/Production sudah dikonfigurasi di dashboard Midtrans.
+- [ ] **Uji Coba Transaksi 1 IDR**: Lakukan satu kali checkout uji coba live untuk memverifikasi QRIS dan notifikasi webhook.
+- [ ] **Jadwal Backup Otomatis**: Buat cron job harian untuk pencadangan `pg_dump` dan arsip data berita.
+
+---
+
+## 📦 8. Verifikasi Arsip Bersih (`scripts/export-clean.sh`)
+
+Untuk membuat paket arsip bersih siap distribusi:
 ```bash
 ./scripts/export-clean.sh
 ```
-
-Hasil arsip akan tersimpan sebagai `portalberita-jualticket-clean.zip` dan secara otomatis diverifikasi integritasnya.
-
----
-
-## 🌐 Akses Pengguna & URL
-
-Setelah server aktif, akses melalui port publik 3000:
-
-- **Portal Berita**: [http://localhost:3000](http://localhost:3000)
-- **Pemesanan Tiket Bus**: [http://localhost:3000/tiket](http://localhost:3000/tiket)
-- **Panel Admin Tiket**: [http://localhost:3000/tiket/admin](http://localhost:3000/tiket/admin) *(Proteksi server-side)*
-- **API Health Check**: [http://localhost:3000/tiket-api/health](http://localhost:3000/tiket-api/health)
-- **API Kuota Tiket**: [http://localhost:3000/tiket-api/quota](http://localhost:3000/tiket-api/quota)
-
----
-
-## 🛡️ Kebijakan Keamanan & Integritas Data
-
-1. **Proteksi Server-Side Admin**: Halaman `/tiket/admin/*` diproteksi sebelum render via Next.js Edge Middleware dengan Web Crypto HMAC-SHA256. Request tanpa cookie sesi valid ditolak langsung dengan HTTP 307 Redirect ke `/tiket/admin/login`.
-2. **Pelepasan Reservasi Kuota Kedaluwarsa**: Kuota tiket tertahan (`kuota_terpesan`) otomatis dilepas secara transaksional di dalam kueri checkout (setelah `FOR UPDATE`) serta oleh sweeper berkala di latar belakang.
-3. **Pembayaran Terlambat**: Pembayaran webhook yang sah untuk transaksi yang sudah kedaluwarsa ditandai `NEEDS_REFUND`, tidak menerbitkan tiket, dan muncul pada ekspor Excel admin untuk tindak lanjut pengembalian dana.
-4. **Rate Limiting**: Pembatasan laju request sederhana diterapkan pada endpoint sensitif API tiket (`POST /api/checkout` maks 20/menit dan `POST /api/admin/login` maks 5/menit). Login portal berita tetap tanpa limitasi sesuai keputusan pemilik.
+Script otomatis memverifikasi bahwa file `.zip` bebas dari `node_modules/`, `.next/`, `dist/`, `.env*` aktif, database lokal, dan file uploads.

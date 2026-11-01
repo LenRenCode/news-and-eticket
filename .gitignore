@@ -12,11 +12,14 @@ dist/
 !**/.env.example
 
 # Local SQLite databases and uploads
+data/
 berita/data/
+uploads/
+backup/
+*.db
+*.db-wal
+*.db-shm
 
 # Local archives and API session data
 *.zip
 **/sessions.db
-
-# pengambungan
-PENGGABUNGAN_LOG.md

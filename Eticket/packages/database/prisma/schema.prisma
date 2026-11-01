@@ -13,6 +13,7 @@ enum PaymentStatus {
   FAILED
   EXPIRED
   NEEDS_REFUND
+  REFUNDED
 
   @@map("payment_status")
 }
@@ -68,6 +69,9 @@ model Transaksi {
   qrisUrl         String?       @map("qris_url") @db.Text
   expiredAt       DateTime      @map("expired_at") @db.Timestamptz()
   paidAt          DateTime?     @map("paid_at") @db.Timestamptz()
+  refundNotes     String?       @map("refund_notes") @db.Text
+  refundedAt      DateTime?     @map("refunded_at") @db.Timestamptz()
+  refundedBy      String?       @map("refunded_by") @db.VarChar(100)
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 

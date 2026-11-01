@@ -27,8 +27,13 @@ function sessionSignature(payload: string, key: string): string {
 
 function cookieOptions(req?: Request): string {
   const isProd = isProductionMode();
+  const forwardedProto = req
+    ?.get("x-forwarded-proto")
+    ?.split(",")[0]
+    .trim()
+    .toLowerCase();
   const isHttps = req
-    ? req.secure || req.get("x-forwarded-proto") === "https"
+    ? req.secure || forwardedProto === "https"
     : false;
   const secure = isProd && isHttps ? "; Secure" : "";
   return `; HttpOnly; Path=/; SameSite=Lax${secure}`;
