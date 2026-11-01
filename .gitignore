@@ -17,3 +17,6 @@ berita/data/
 # Local archives and API session data
 *.zip
 **/sessions.db
+
+# pengambungan
+PENGGABUNGAN_LOG.md
